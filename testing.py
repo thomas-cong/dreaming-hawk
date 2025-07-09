@@ -24,7 +24,6 @@ def random_distribution_matrix(d, N, density = 0.1, seed = 42):
     R: random distribution matrix
     '''
     rng = np.random.default_rng(seed)
-    R = rng.choice(N, size = int(d * density), replace = False)
     # number of non-zero elements
     nnz = int(density * d * N)
     # select random rows that dshould have values assigned there
@@ -49,6 +48,8 @@ def make_sdr(embedding, R, sparsity):
     Returns:
     SDR: sparse distributed representation
     '''
+    # normalize the embedding
+    embedding = embedding / np.linalg.norm(embedding)
     # take the dot product of R and the embedding
     dot_product = embedding @ R
     # number of non-zero elements
@@ -59,12 +60,20 @@ def make_sdr(embedding, R, sparsity):
     sdr = np.zeros(R.shape[1], dtype=np.uint8)
     sdr[idx] = 1
     return sdr
+def cosine_similarity(a, b):
+    return np.dot(a, b.T) / (np.linalg.norm(a) * np.linalg.norm(b))
 if __name__ == "__main__":
-    text = "Brainrot"
-    embeddings = model.encode([text])
+    texts = ["Apple", "Computer", "Shit", "Poop"]
+    embeddings = model.encode(texts)
     R = random_distribution_matrix(len(embeddings[0]), 4096, density = 0.1, seed = 42)
     # ten percent density SDR
-    sdr = make_sdr(embeddings[0], R, 0.1)
-    print(sdr)
+    sdrs = [make_sdr(embedding, R, 0.1) for embedding in embeddings]
+    for i, sdr in enumerate(sdrs):
+        if i == len(sdrs) - 1:
+            break
+        print("Texts:", texts[i], texts[i+1])
+        print("Embedding Similarity:", cosine_similarity(embeddings[i], embeddings[i+1]))
+        print("SDR Similarity:", cosine_similarity(sdr, sdrs[i+1]))
+    
 
     
