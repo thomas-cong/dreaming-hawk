@@ -7,7 +7,80 @@ from htm.algorithms.anomaly_likelihood import AnomalyLikelihood
 from htm.bindings.algorithms import Predictor
 model_path = '/Users/tcong/models/all-MiniLM-L6-v2'
 model = SentenceTransformer(model_path)
+HTM_DIM = 4096
+# -----------------------------------------------------------------------------
+# HTM setup (parameters borrowed from the Numenta Hotgym example)
+# -----------------------------------------------------------------------------
 
+# Hyper-parameters for the Spatial Pooler, Temporal Memory, etc.
+default_parameters = {
+    'sp': {
+        'boostStrength': 3.0,
+        'columnCount': 1638,
+        'localAreaDensity': 0.04395604395604396,
+        'potentialPct': 0.85,
+        'synPermActiveInc': 0.04,
+        'synPermConnected': 0.13999999999999999,
+        'synPermInactiveDec': 0.006,
+    },
+    'tm': {
+        'activationThreshold': 17,
+        'cellsPerColumn': 13,
+        'initialPerm': 0.21,
+        'maxSegmentsPerCell': 128,
+        'maxSynapsesPerSegment': 64,
+        'minThreshold': 10,
+        'newSynapseCount': 32,
+        'permanenceDec': 0.1,
+        'permanenceInc': 0.1,
+    },
+    'predictor': {'sdrc_alpha': 0.1},
+    'anomaly': {'period': 1000},
+}
+
+# Use the SDR length (HTM_DIM) produced by our embedding→SDR pipeline.
+encodingWidth = HTM_DIM
+spParams = default_parameters['sp']
+tmParams = default_parameters['tm']
+
+# Spatial Pooler
+sp = SpatialPooler(
+    inputDimensions=(encodingWidth,),
+    columnDimensions=(spParams['columnCount'],),
+    potentialPct=spParams['potentialPct'],
+    potentialRadius=encodingWidth,
+    globalInhibition=True,
+    localAreaDensity=spParams['localAreaDensity'],
+    synPermInactiveDec=spParams['synPermInactiveDec'],
+    synPermActiveInc=spParams['synPermActiveInc'],
+    synPermConnected=spParams['synPermConnected'],
+    boostStrength=spParams['boostStrength'],
+    wrapAround=True,
+)
+
+# Temporal Memory
+tm = TemporalMemory(
+    columnDimensions=(spParams['columnCount'],),
+    cellsPerColumn=tmParams['cellsPerColumn'],
+    activationThreshold=tmParams['activationThreshold'],
+    initialPermanence=tmParams['initialPerm'],
+    connectedPermanence=spParams['synPermConnected'],
+    minThreshold=tmParams['minThreshold'],
+    maxNewSynapseCount=tmParams['newSynapseCount'],
+    permanenceIncrement=tmParams['permanenceInc'],
+    permanenceDecrement=tmParams['permanenceDec'],
+    predictedSegmentDecrement=0.0,
+    maxSegmentsPerCell=tmParams['maxSegmentsPerCell'],
+    maxSynapsesPerSegment=tmParams['maxSynapsesPerSegment'],
+)
+
+# Anomaly Likelihood & Predictor
+anomaly_history = AnomalyLikelihood(default_parameters['anomaly']['period'])
+predictor = Predictor(steps=[1, 5], alpha=default_parameters['predictor']['sdrc_alpha'])
+
+# -----------------------------------------------------------------------------
+# End HTM setup
+# -----------------------------------------------------------------------------
 # TODO: Inspect what exactly an SDR is composed of, and investigate what I can do to convert a vector to a SDR for HTM
 # TODO: Consider using online EWC as reweighting function for LORA- still monitor anomalies using HTM/other encoding distances
 
