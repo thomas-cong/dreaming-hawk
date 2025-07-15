@@ -16,8 +16,17 @@ def parse_text(file_path, mode = 'words'):
         return sentence_list
     else:
         raise ValueError("Mode must be 'words' or 'sentences'")
+def sliding_window(text, window_size=3, stride=1):
+    """Yields sliding windows of a given size and stride from a list."""
+    if window_size <= 0 or stride <= 0:
+        raise ValueError("window_size and stride must be positive integers")
+    
+    for i in range(0, len(text) - window_size + 1, stride):
+        yield text[i:i + window_size]
+    
+    
 if __name__ == "__main__":
-    sentences = parse_text("/Users/tcong/dreaming-hawk/TrainingTexts/Letter.txt", mode = 'sentences')
-    for sentence in sentences:
-        print(sentence)
+    canon = parse_text("/Users/tcong/dreaming-hawk/TrainingTexts/FullSherlockHolmes.txt", mode='words')
+    for window in sliding_window(canon, window_size=10, stride=3):
+        print(window)
     

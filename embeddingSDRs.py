@@ -3,6 +3,7 @@ import os
 from scipy.sparse import coo_matrix
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
+from tqdm import tqdm
 load_dotenv(".env")
 HTM_DIM = int(os.environ["HTM_DIM"])
 model_path = '/Users/tcong/models/all-MiniLM-L6-v2'
@@ -56,7 +57,7 @@ def make_sdr(embedding: np.ndarray, R: coo_matrix, sparsity: float) -> list[int]
     # create an SDR with k non-zero elements
     sdr = np.zeros(R.shape[1], dtype=np.uint8)
     sdr[idx] = 1
-    return sdr
+    return tuple(sdr)
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return np.dot(a, b.T) / (np.linalg.norm(a) * np.linalg.norm(b))
 def make_binary_vectors(text: list[str], density: float = 0.1, R: coo_matrix = None) -> list[int]:
@@ -73,7 +74,8 @@ def make_binary_vectors(text: list[str], density: float = 0.1, R: coo_matrix = N
         R = random_distribution_matrix(len(embeddings[0]), HTM_DIM, density = density, seed = 42)
     # ten percent density SDR
     sdrs = []
-    for embedding in embeddings:
+    print("Making SDRS from embeddings")
+    for embedding in tqdm(embeddings):
         sdr = make_sdr(embedding, R, density)
         sdrs.append(sdr)
     return sdrs
