@@ -1,3 +1,3 @@
 # dreaming-hawk
 
-HTM + DL experimentation
+A testing bed
