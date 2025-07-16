@@ -5,6 +5,9 @@ _WORD_PATTERN = re.compile(r"\b\w+\b")
 # Split on one or more sentence-ending punctuation marks (., !, ?)
 _SENTENCE_SPLIT_PATTERN = re.compile(r"[.!?]+")
 def parse_text(file_path, mode = 'words'):
+    '''
+    Parses a text file into a list of words or sentences.
+    '''
     with open(file_path, 'r') as f:
         text = f.read()
     if mode == 'words':
@@ -17,7 +20,9 @@ def parse_text(file_path, mode = 'words'):
     else:
         raise ValueError("Mode must be 'words' or 'sentences'")
 def sliding_window(text, window_size=3, stride=1):
-    """Yields sliding windows of a given size and stride from a list."""
+    '''
+    Yields sliding windows of a given size and stride from a list.
+    '''
     if window_size <= 0 or stride <= 0:
         raise ValueError("window_size and stride must be positive integers")
     
