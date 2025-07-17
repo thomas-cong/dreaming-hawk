@@ -6,40 +6,6 @@ from wordGraph import WordGraph
 import networkx as nx
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-def wordGraphFromText(text_path = None, text = None, window_size = 3, yield_frames = False, frame_step = 10):
-    if text_path is None and text is None:
-        raise ValueError("Either text_path or text must be provided")
-    if text_path and text:
-        raise ValueError("Only one of text_path or text can be provided")
-    if text_path:
-        text = parse_text(text_path, mode='words')
-    
-    wg = WordGraph(expiration_time=window_size)
-    window = []
-    embedding_memo = {}
-    step = 0
-    if yield_frames:
-        yield wg.copy() # Yield the initial empty graph
-    for word in tqdm(text, desc="Building Graph"):
-        step += 1
-        wg.add_word_node(word)
-        wg.tick()
-        if word not in embedding_memo:
-            embedding_memo[word] = encode_text(word)
-        for prev in window:
-            if prev not in embedding_memo:
-                embedding_memo[prev] = encode_text(prev)
-            weight = cosine_similarity(embedding_memo[prev], embedding_memo[word])
-            wg.add_semantic_edge(prev, word, weight=weight)
-            wg.add_temporal_edge(prev, word)
-        window.append(word)
-        if len(window) > window_size:
-            window.pop(0)
-        if yield_frames and step % frame_step == 0:
-            yield wg.copy() # Yield a copy of the graph at each frame step
-
-    if not yield_frames:
-        return wg
 
 import matplotlib.animation as animation
 from matplotlib.lines import Line2D
@@ -83,14 +49,17 @@ def visualizeWordGraph(wg, ax, pos):
 
 def animateGraphBuilding(text_path, window_size, frame_step):
     fig, ax = plt.subplots(figsize=(10, 8))
-    full_graph_generator = wordGraphFromText(text_path=text_path, window_size=window_size, yield_frames=True, frame_step=frame_step)
+    wg = WordGraph(text_window_size=window_size)
+    text = parse_text(text_path, mode = 'words')
+    full_graph_generator = wg.addText(text=text, yield_frames=True, frame_step=frame_step)
     all_frames = list(full_graph_generator)
     if not all_frames:
         print("No frames generated.")
         return
     final_graph = all_frames[-1]
     pos = nx.spring_layout(final_graph, seed=42)
-    animation_generator = wordGraphFromText(text_path=text_path, window_size=window_size, yield_frames=True, frame_step=frame_step)
+    wg = WordGraph(text_window_size=window_size)
+    animation_generator = wg.addText(text=text, yield_frames=True, frame_step=frame_step)
     def update(frame_graph):
         visualizeWordGraph(frame_graph, ax, pos)
     ani = animation.FuncAnimation(fig, update, frames=animation_generator, repeat=False, interval=30, save_count=len(all_frames))

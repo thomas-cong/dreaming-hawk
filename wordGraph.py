@@ -1,4 +1,6 @@
 import networkx as nx
+from tqdm import tqdm
+import textUtils
 class WordNodeData:
     def __init__(self, word, value):
         self.word = word
@@ -15,12 +17,13 @@ class WordNodeData:
     def __hash__(self):
         return hash(self.word)
 class WordGraph(nx.MultiDiGraph):
-    def __init__(self, expiration_time=30, semantic_threshold = 0.5):
+    def __init__(self, text_window_size=30, semantic_threshold = 0.5):
         super().__init__()
-        self.expiration_time = expiration_time
+        self.text_window_size = text_window_size
         self.semantic_threshold = semantic_threshold
         self.time = 0
         self.expiration_object_dict = {}
+        self.embedding_memo = {}
     def add_word_node(self, word):
         '''
         Adds a word to the graph or increments its value if it already exists.
@@ -58,24 +61,22 @@ class WordGraph(nx.MultiDiGraph):
         if weight >= self.semantic_threshold:
             self.add_edge(word1, word2, weight=weight)
         return None
-        
-
-    def add_temporal_edge(self, word1, word2, expiration=None):
+    def add_temporal_edge(self, word1, word2, duration=None):
         '''
         Adds a temporal edge between two words.
-        The edge will expire after the specified expiration time.
-        If expiration is None, the edge will expire after the expiration time of the graph.
+        The edge will expire after the specified duration.
+        If duration is None, the edge will expire after the text window size of the graph.
         '''
-        if expiration is None:
-            expiration = self.expiration_time
+        if duration is None:
+            duration = self.text_window_size
         if not self.has_node(word1):
             self.add_word_node(word1)
         if not self.has_node(word2):
             self.add_word_node(word2)
-        self.add_edge(word1, word2, type="temporal", expiration=self.time + expiration)
-        if self.time + expiration not in self.expiration_object_dict:
-            self.expiration_object_dict[self.time + expiration] = []
-        self.expiration_object_dict[self.time + expiration].append((word1, word2))
+        self.add_edge(word1, word2, type="temporal", expiration_time=self.time + duration)
+        if self.time + duration not in self.expiration_object_dict:
+            self.expiration_object_dict[self.time + duration] = []
+        self.expiration_object_dict[self.time + duration].append((word1, word2))
         return None
 
     def tick(self):
@@ -91,16 +92,38 @@ class WordGraph(nx.MultiDiGraph):
                 key_to_remove = None
                 if self.has_edge(u, v):
                     for key, data in self.get_edge_data(u, v).items():
-                        if data.get('type') == 'temporal' and data.get('expiration') == self.time:
+                        if data.get('type') == 'temporal' and data.get('expiration_time') == self.time:
                             key_to_remove = key
                             break # Remove one edge per tick
                 if key_to_remove is not None:
                     self.remove_edge(u, v, key=key_to_remove)
             del self.expiration_object_dict[self.time]
+    def addText(self, text, yield_frames=False, frame_step=1):
+        window = []
+        step = 0
+        if yield_frames:
+            yield self.copy() # Yield the initial empty graph
+        for word in tqdm(text):
+            step += 1
+            self.add_word_node(word)
+            self.tick()
+            if word not in self.embedding_memo:
+                self.embedding_memo[word] = textUtils.encode_text(word)
+            for prev in window:
+                if prev not in self.embedding_memo:
+                    self.embedding_memo[prev] = textUtils.encode_text(prev)
+                weight = textUtils.cosine_similarity(self.embedding_memo[prev], self.embedding_memo[word])
+                self.add_semantic_edge(prev, word, weight=weight)
+                self.add_temporal_edge(prev, word)
+            window.append(word)
+            if len(window) > self.text_window_size:
+                window.pop(0)
+            if yield_frames and step % frame_step == 0:
+                yield self.copy() # Yield a copy of the graph at each frame step
 
 def main():
     # text sequence is apple apple banana
-    wg = WordGraph(expiration_time=5)
+    wg = WordGraph(text_window_size=5)
     wg.add_word_node("apple")
     wg.add_word_node("apple")
     wg.add_word_node("banana")
