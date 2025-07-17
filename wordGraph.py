@@ -1,21 +1,28 @@
 import networkx as nx
 from tqdm import tqdm
 import textUtils
+
 class WordNodeData:
     def __init__(self, word, value):
         self.word = word
         self.value = value
+
     def set_value(self, value):
         self.value = value
+
     def get_value(self):
         return self.value
+
     def __str__(self):
         return "WordNode(" + self.word + ", " + str(self.value) + ")"
+
     def __iadd__(self, other):
         self.value += other
         return self
+
     def __hash__(self):
         return hash(self.word)
+
 class WordGraph(nx.MultiDiGraph):
     def __init__(self, text_window_size=30, semantic_threshold = 0.5):
         super().__init__()
@@ -24,6 +31,14 @@ class WordGraph(nx.MultiDiGraph):
         self.time = 0
         self.expiration_object_dict = {}
         self.embedding_memo = {}
+        self.window = []
+
+    def get_window(self):
+        return self.window
+
+    def get_time(self):
+        return self.time
+
     def add_word_node(self, word):
         '''
         Adds a word to the graph or increments its value if it already exists.
@@ -36,6 +51,7 @@ class WordGraph(nx.MultiDiGraph):
             node_data = WordNodeData(word, 1)
             self.add_node(word, data=node_data)
         return None
+
     def get_word_node_data(self, word):
         '''
         Access the WordNode object for a given word string.
@@ -61,6 +77,7 @@ class WordGraph(nx.MultiDiGraph):
         if weight >= self.semantic_threshold:
             self.add_edge(word1, word2, weight=weight)
         return None
+
     def add_temporal_edge(self, word1, word2, duration=None):
         '''
         Adds a temporal edge between two words.
@@ -98,8 +115,25 @@ class WordGraph(nx.MultiDiGraph):
                 if key_to_remove is not None:
                     self.remove_edge(u, v, key=key_to_remove)
             del self.expiration_object_dict[self.time]
-    def addText(self, text, yield_frames=False, frame_step=1):
-        window = []
+
+    def addText(self, text, yield_frames=False, frame_step=1, reset_window=False):
+        '''
+        Adds text to the graph.
+        If yield_frames is True, this method is a generator that yields graph states.
+        If yield_frames is False, this method runs to completion.
+        '''
+        gen = self._graphUpdate(text, yield_frames, frame_step, reset_window)
+        if yield_frames:
+            return gen
+        else:
+            # Consume the generator to run the update to completion
+            for _ in gen:
+                pass
+            return None
+
+    def _graphUpdate(self, text, yield_frames=False, frame_step=1, reset_window=False):
+        if reset_window:
+            self.window = []
         step = 0
         if yield_frames:
             yield self.copy() # Yield the initial empty graph
@@ -109,32 +143,27 @@ class WordGraph(nx.MultiDiGraph):
             self.tick()
             if word not in self.embedding_memo:
                 self.embedding_memo[word] = textUtils.encode_text(word)
-            for prev in window:
+            for prev in self.window:
                 if prev not in self.embedding_memo:
                     self.embedding_memo[prev] = textUtils.encode_text(prev)
                 weight = textUtils.cosine_similarity(self.embedding_memo[prev], self.embedding_memo[word])
                 self.add_semantic_edge(prev, word, weight=weight)
                 self.add_temporal_edge(prev, word)
-            window.append(word)
-            if len(window) > self.text_window_size:
-                window.pop(0)
+            self.window.append(word)
+            if len(self.window) > self.text_window_size:
+                self.window.pop(0)
             if yield_frames and step % frame_step == 0:
                 yield self.copy() # Yield a copy of the graph at each frame step
 
 def main():
     # text sequence is apple apple banana
     wg = WordGraph(text_window_size=5)
-    wg.add_word_node("apple")
-    wg.add_word_node("apple")
-    wg.add_word_node("banana")
-    wg.add_semantic_edge("apple", "banana", weight=0.8)
-    wg.add_temporal_edge("apple", "banana")
-    print(f"Edges before tick: {list(wg.edges())}")
-    wg.tick()
-    print(f"Edges after 1st tick: {list(wg.edges())}")
-    for _ in range(5):
-        wg.tick()
-    print(f"Edges after 6 ticks: {list(wg.edges())}")
+    wg.addText(["hello", "my"]) # yield_frames is False by default, so this runs completely
+    print(wg.get_window())
+    wg.addText(["name", "is", "cong"])
+    print(wg.get_window())
+    wg.addText(["window", "is", "big"])
+    print(wg.get_window())
 
 if __name__ == '__main__':
     main()
