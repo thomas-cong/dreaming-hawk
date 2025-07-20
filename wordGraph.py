@@ -198,7 +198,7 @@ class WordGraph(nx.MultiDiGraph):
 
 def main():
     # text sequence is apple apple banana
-    wg = WordGraph(text_window_size=5)
+    pass
 
 if __name__ == '__main__':
     main()

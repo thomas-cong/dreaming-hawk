@@ -36,7 +36,8 @@ def visualizeWordGraph(wg, ax, pos):
         node_y = [pos[n][1] for n in wg.nodes()]
         ax.scatter(node_x, node_y, s=node_sizes, color='skyblue', zorder=2, ec='black')
     for node, (x, y) in pos.items():
-        ax.text(x, y, node, ha='center', va='center', fontsize=2, weight='bold')
+        fontsize = max(6, wg.nodes[node]['data'].get_value() + 4)  # readable font size
+        ax.text(x, y, node, ha='center', va='center', fontsize=fontsize, weight='bold')
     # Create and display legend
     legend_elements = []
     if any('weight' in d for _, _, d in wg.edges(data=True)):
@@ -46,52 +47,75 @@ def visualizeWordGraph(wg, ax, pos):
     
     if legend_elements:
         ax.legend(handles=legend_elements)
-def animateGraphBuilding(text_path, window_size, frame_step):
+
+def _precompute_layout(graph: WordGraph):
+    """Return a stable spring layout for *graph*.
+    The spring layout can be slow on large graphs so we pin the random seed to
+    ensure deterministic results across runs.
+    """
+    return nx.spring_layout(graph, seed=42)
+
+def animateGraphBuilding(text_path: str, window_size: int, frame_step: int):
+    """Animate graph construction without duplicating work or materialising every frame."""
+    text = parse_text(text_path, mode='words')
+
+    # Build *one* graph to obtain final structure for layout computation – this
+    # is O(N) once, instead of twice as before.
+    wg_final = WordGraph(text_window_size=window_size)
+    wg_final.add_text(text=text, yield_frames=False)
+    pos = _precompute_layout(wg_final)
+
+    # Create a fresh graph for the animation stream.
+    wg_anim = WordGraph(text_window_size=window_size)
+    frame_gen = wg_anim.add_text(text=text, yield_frames=True, frame_step=frame_step)
+
     fig, ax = plt.subplots(figsize=(10, 8))
-    wg = WordGraph(text_window_size=window_size)
-    text = parse_text(text_path, mode = 'words')
-    full_graph_generator = wg.add_text(text=text, yield_frames=True, frame_step=frame_step)
-    all_frames = list(full_graph_generator)
-    if not all_frames:
-        print("No frames generated.")
-        return
-    final_graph = all_frames[-1]
-    pos = nx.spring_layout(final_graph, seed=42)
-    wg = WordGraph(text_window_size=window_size)
+
     def update(frame_graph):
         visualizeWordGraph(frame_graph, ax, pos)
-    animation_generator = wg.add_text(text=text, yield_frames=True, frame_step=frame_step)
-    ani = animation.FuncAnimation(fig, update, frames=animation_generator, repeat=False, interval=30, save_count=len(all_frames))
+
+    ani = animation.FuncAnimation(fig,
+                                  update,
+                                  frames=frame_gen,
+                                  repeat=False,
+                                  interval=30)
     plt.show()
-    return final_graph
-def animateGraphEnrichment(text_path,frame_step, wg):
-    fig, ax = plt.subplots(figsize=(10, 8))
+    return wg_final
+def animateGraphEnrichment(text_path: str, frame_step: int, wg: WordGraph):
+    """Animate semantic-edge enrichment while avoiding redundant passes."""
     with open(text_path, 'r') as f:
         text = f.read()
-    print("Text read")
-    wg_copy = wg.copy()
-    full_graph_generator = wg.enrich_semantic_connections(text=text, yield_frames=True, frame_step=frame_step)
-    all_frames = list(full_graph_generator)
-    if not all_frames:
-        print("No frames generated.")
-        return
-    final_graph = all_frames[-1]
-    pos = nx.spring_layout(final_graph, seed=42)
+
+    # Compute final enriched graph once for layout.
+    wg_enriched = wg.copy()
+    wg_enriched.enrich_semantic_connections(text=text, yield_frames=False)
+    pos = _precompute_layout(wg_enriched)
+
+    # Stream enrichment frames from a *fresh* copy (so initial state is clean).
+    wg_stream = wg.copy()
+    frame_gen = wg_stream.enrich_semantic_connections(text=text, yield_frames=True, frame_step=frame_step)
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+
     def update(frame_graph):
         visualizeWordGraph(frame_graph, ax, pos)
-    animation_generator = wg_copy.enrich_semantic_connections(text=text, yield_frames=True, frame_step=frame_step)
-    ani = animation.FuncAnimation(fig, update, frames=animation_generator, repeat=False, interval=10, save_count=len(all_frames))
+
+    ani = animation.FuncAnimation(fig,
+                                  update,
+                                  frames=frame_gen,
+                                  repeat=False,
+                                  interval=10)
     plt.show()
 def main():
-    text_path = "/Users/tcong/dreaming-hawk/TrainingTexts/ChalmersPaper.txt"
-    window_size = 5
-    frame_step = 5  # Adjust this to control animation speed/granularity
-    text = parse_text(text_path, mode='words')
-    wg = WordGraph(text_window_size=window_size)
+    with open("/Users/tcong/dreaming-hawk/TrainingTexts/ChalmersPaper.txt", 'r') as f:
+        text = f.read()
     fig, ax = plt.subplots(figsize=(10, 8))
-    wg.add_text(text=text, yield_frames=False, frame_step=frame_step)
-    frame_step = 1
-    animateGraphEnrichment(text_path, frame_step, wg)
+    wg = WordGraph(text_window_size=5)
+    wg.add_text(text)
+    wg.enrich_semantic_connections(text=text)
+    visualizeWordGraph(wg, ax, _precompute_layout(wg))
+    export_interactive_word_graph(wg, "ChalmersPaper.html")
+    plt.show()
     
 if __name__ == "__main__":
     main()
