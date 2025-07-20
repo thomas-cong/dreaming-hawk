@@ -23,6 +23,7 @@ class WordNodeData:
     def __hash__(self):
         return hash(self.word)
 
+
 class WordGraph(nx.MultiDiGraph):
     def __init__(self, text_window_size=30, semantic_threshold = 0.5):
         super().__init__()
@@ -73,9 +74,11 @@ class WordGraph(nx.MultiDiGraph):
             self.add_word_node(word1)
         if not self.has_node(word2):
             self.add_word_node(word2)
-        # Add the edge with a weight attribute
+        # Add the edge with a weight 
+        # Edge forms a loop, going both ways
         if weight >= self.semantic_threshold:
             self.add_edge(word1, word2, weight=weight)
+            self.add_edge(word2, word1, weight=weight)
         return None
 
     def add_temporal_edge(self, word1, word2, duration=None):
@@ -116,13 +119,17 @@ class WordGraph(nx.MultiDiGraph):
                     self.remove_edge(u, v, key=key_to_remove)
             del self.expiration_object_dict[self.time]
 
-    def addText(self, text, yield_frames=False, frame_step=1, reset_window=False):
+    def add_text(self, text, yield_frames=False, frame_step=1, reset_window=False):
         '''
         Adds text to the graph.
         If yield_frames is True, this method is a generator that yields graph states.
         If yield_frames is False, this method runs to completion.
         '''
-        gen = self._graphUpdate(text, yield_frames, frame_step, reset_window)
+        if isinstance(text, str):
+            words = textUtils.split_text(text, mode='words')
+        else:
+            words = text
+        gen = self._graphUpdate(words, yield_frames, frame_step, reset_window)
         if yield_frames:
             return gen
         else:
@@ -130,14 +137,13 @@ class WordGraph(nx.MultiDiGraph):
             for _ in gen:
                 pass
             return None
-
-    def _graphUpdate(self, text, yield_frames=False, frame_step=1, reset_window=False):
+    def _graphUpdate(self, words, yield_frames=False, frame_step=1, reset_window=False):
         if reset_window:
             self.window = []
         step = 0
         if yield_frames:
             yield self.copy() # Yield the initial empty graph
-        for word in tqdm(text):
+        for word in tqdm(words):
             step += 1
             self.add_word_node(word)
             self.tick()
@@ -154,16 +160,45 @@ class WordGraph(nx.MultiDiGraph):
                 self.window.pop(0)
             if yield_frames and step % frame_step == 0:
                 yield self.copy() # Yield a copy of the graph at each frame step
+    def enrich_semantic_connections(self, text, yield_frames=False, frame_step=1, sentence_weighting = 0.9, paragraph_weighting = 0.6):
+        gen = self._enrich_semantic_connections(text, sentence_weighting, paragraph_weighting)
+        if yield_frames:
+            return gen
+        else:
+            # Consume the generator to run the update to completion
+            for _ in gen:
+                pass
+            return None
+    def _enrich_semantic_connections(self, text, sentence_weighting = 0.9, paragraph_weighting = 0.6):
+        '''
+        Enriches the graph with semantic connections between words.
+        '''
+        if not text:
+            raise ValueError("Text must not be empty")
+        words_not_found = 0
+        # Parse sentences, and semantically link words within sentences
+        sentences = textUtils.split_text(text, mode='sentences')
+        for sentence in tqdm(sentences):
+            word_list = []
+            sentence_words = textUtils.split_text(sentence, mode='words')
+            for word in tqdm(sentence_words):
+                if word not in self.nodes:
+                    self.add_word_node(word)
+                if word not in self.embedding_memo:
+                    words_not_found += 1
+                    self.embedding_memo[word] = textUtils.encode_text(word)
+                for i in range(len(word_list)):
+                    weight = textUtils.cosine_similarity(self.embedding_memo[word_list[i]], self.embedding_memo[word])
+                    self.add_semantic_edge(word_list[i], word, weight=weight * sentence_weighting)
+                    yield self.copy()
+                word_list.append(word)
+        print("Words not found: " + str(words_not_found))
+    
+                    
 
 def main():
     # text sequence is apple apple banana
     wg = WordGraph(text_window_size=5)
-    wg.addText(["hello", "my"]) # yield_frames is False by default, so this runs completely
-    print(wg.get_window())
-    wg.addText(["name", "is", "cong"])
-    print(wg.get_window())
-    wg.addText(["window", "is", "big"])
-    print(wg.get_window())
 
 if __name__ == '__main__':
     main()

@@ -46,12 +46,11 @@ def visualizeWordGraph(wg, ax, pos):
     
     if legend_elements:
         ax.legend(handles=legend_elements)
-
 def animateGraphBuilding(text_path, window_size, frame_step):
     fig, ax = plt.subplots(figsize=(10, 8))
     wg = WordGraph(text_window_size=window_size)
     text = parse_text(text_path, mode = 'words')
-    full_graph_generator = wg.addText(text=text, yield_frames=True, frame_step=frame_step)
+    full_graph_generator = wg.add_text(text=text, yield_frames=True, frame_step=frame_step)
     all_frames = list(full_graph_generator)
     if not all_frames:
         print("No frames generated.")
@@ -59,16 +58,41 @@ def animateGraphBuilding(text_path, window_size, frame_step):
     final_graph = all_frames[-1]
     pos = nx.spring_layout(final_graph, seed=42)
     wg = WordGraph(text_window_size=window_size)
-    animation_generator = wg.addText(text=text, yield_frames=True, frame_step=frame_step)
     def update(frame_graph):
         visualizeWordGraph(frame_graph, ax, pos)
+    animation_generator = wg.add_text(text=text, yield_frames=True, frame_step=frame_step)
     ani = animation.FuncAnimation(fig, update, frames=animation_generator, repeat=False, interval=30, save_count=len(all_frames))
+    plt.show()
+    return final_graph
+def animateGraphEnrichment(text_path,frame_step, wg):
+    fig, ax = plt.subplots(figsize=(10, 8))
+    with open(text_path, 'r') as f:
+        text = f.read()
+    print("Text read")
+    wg_copy = wg.copy()
+    full_graph_generator = wg.enrich_semantic_connections(text=text, yield_frames=True, frame_step=frame_step)
+    all_frames = list(full_graph_generator)
+    if not all_frames:
+        print("No frames generated.")
+        return
+    final_graph = all_frames[-1]
+    pos = nx.spring_layout(final_graph, seed=42)
+    def update(frame_graph):
+        visualizeWordGraph(frame_graph, ax, pos)
+    animation_generator = wg_copy.enrich_semantic_connections(text=text, yield_frames=True, frame_step=frame_step)
+    ani = animation.FuncAnimation(fig, update, frames=animation_generator, repeat=False, interval=10, save_count=len(all_frames))
     plt.show()
 def main():
     text_path = "/Users/tcong/dreaming-hawk/TrainingTexts/ChalmersPaper.txt"
     window_size = 5
-    frame_step = 1  # Adjust this to control animation speed/granularity
-    animateGraphBuilding(text_path, window_size, frame_step)
+    frame_step = 5  # Adjust this to control animation speed/granularity
+    text = parse_text(text_path, mode='words')
+    wg = WordGraph(text_window_size=window_size)
+    fig, ax = plt.subplots(figsize=(10, 8))
+    wg.add_text(text=text, yield_frames=False, frame_step=frame_step)
+    frame_step = 1
+    animateGraphEnrichment(text_path, frame_step, wg)
+    
 if __name__ == "__main__":
     main()
     
