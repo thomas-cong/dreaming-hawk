@@ -1,6 +1,10 @@
 import regex as re
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from nltk.corpus import wordnet
+from nltk import pos_tag, word_tokenize
+from nltk.stem import WordNetLemmatizer
+
 # Pre-compiled regex patterns for efficiency
 # Words are sequences of alphanumerics; we purposefully **exclude** apostrophes / hyphens so
 # that ``rock'n'roll`` -> ``rock``, ``n``, ``roll`` and "don't" -> "dont".
@@ -8,6 +12,7 @@ _WORD_PATTERN = re.compile(r"[\p{L}\p{N}]+", re.UNICODE)
 _SENTENCE_SPLIT_PATTERN = re.compile(r"[.!?]+")
 _PARAGRAPH_SPLIT_PATTERN = re.compile(r"\n\s*\n")
 _model = SentenceTransformer('all-MiniLM-L6-v2')
+_lemmatizer = WordNetLemmatizer()
 def _clean_tokens(tokens):
     """Helper – remove apostrophes / hyphens that may slip through and drop empties."""
     return [re.sub(r"[-']", "", t) for t in tokens if t]
@@ -61,6 +66,22 @@ def cosine_text_similarity(text1, text2):
     return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
 def cosine_similarity(vec1, vec2):
     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+def lemmatize_text(text):
+    tokens = word_tokenize(text)
+    tagged = pos_tag(tokens)
+    lemmatized = [_lemmatizer.lemmatize(word, get_wordnet_pos(pos)) for word, pos in tagged]
+    return lemmatized
+def get_wordnet_pos(treebank_tag):
+    if treebank_tag.startswith('J'):
+        return wordnet.ADJ
+    elif treebank_tag.startswith('V'):
+        return wordnet.VERB
+    elif treebank_tag.startswith('N'):
+        return wordnet.NOUN
+    elif treebank_tag.startswith('R'):
+        return wordnet.ADV
+    else:
+        return wordnet.NOUN
 if __name__ == "__main__":
     canon = parse_text("/Users/tcong/dreaming-hawk/TrainingTexts/Letter.txt", mode='paragraphs')
     for chunk in canon:

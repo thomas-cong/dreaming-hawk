@@ -6,6 +6,7 @@ class WordNodeData:
     def __init__(self, word, value):
         self.word = word
         self.value = value
+        self.lemmatized = textUtils.lemmatize_text(word)
 
     def set_value(self, value):
         self.value = value
