@@ -65,8 +65,10 @@ def visualizeWordGraph(wg, ax, pos):
         node_x = [pos[n][0] for n in wg.nodes()]
         node_y = [pos[n][1] for n in wg.nodes()]
         ax.scatter(node_x, node_y, s=node_sizes, color="skyblue", zorder=2, ec="black")
-    for node, (x, y) in pos.items():
-        fontsize = max(6, wg.nodes[node]["data"].get_value() + 4)  # readable font size
+    for node in wg.nodes():
+        x, y = pos[node]
+        # Ensure font remains readable but proportional to node value
+        fontsize = max(6, wg.nodes[node]["data"].get_value() + 4)
         ax.text(x, y, node, ha="center", va="center", fontsize=fontsize, weight="bold")
     # Create and display legend
     legend_elements = []
@@ -143,16 +145,6 @@ def animateGraphEnrichment(text_path: str, frame_step: int, wg: WordGraph):
 
 
 def main():
-    with open("/Users/tcong/dreaming-hawk/TrainingTexts/ChalmersPaper.txt", "r") as f:
-        text = f.read()
-    fig, ax = plt.subplots(figsize=(10, 8))
-    wg = WordGraph(text_window_size=5)
-    wg.add_text(text)
-    wg.enrich_semantic_connections(text=text)
-    visualizeWordGraph(wg, ax, _precompute_layout(wg))
-    export_interactive_word_graph(wg, "ChalmersPaper.html")
-    plt.show()
-
-
+    animateGraphBuilding(text_path="./TrainingTexts/ChalmersPaper.txt", window_size=5, frame_step=1)
 if __name__ == "__main__":
     main()

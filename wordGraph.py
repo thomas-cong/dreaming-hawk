@@ -308,7 +308,7 @@ class WordGraph(nx.MultiDiGraph):
         print("Words not found: " + str(words_not_found))
 
     def jsonify(self):
-        data = nx.node_link_data(self)
+        data = nx.node_link_data(self, edges = "edges")
         json_str = json.dumps(data, cls=NodeEncoder)
         return json_str
 
@@ -317,7 +317,11 @@ def main():
     # text sequence is apple apple banana
     graph = WordGraph()
     graph.add_text("apple apple applesauce")
-    print(graph.jsonify())
+    with open("./graph.json", "w", encoding="utf-8") as f:
+        f.write(graph.jsonify())
+
+        
+    
 
 
 if __name__ == "__main__":
