@@ -13,4 +13,4 @@ A testing bed
 
 ## Demo
 
-<video src="ChalmersTextDemo.mov" controls width="640"></video>
+<video src="ChalmersTextDemo.mp4" controls width="640"></video>
