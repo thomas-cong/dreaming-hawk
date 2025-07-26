@@ -16,7 +16,7 @@ _model = SentenceTransformer("all-MiniLM-L6-v2")
 _lemmatizer = WordNetLemmatizer()
 
 
-def _clean_tokens(tokens):
+def _clean_tokens(tokens: list[str]):
     """Helper – remove apostrophes / hyphens that may slip through and drop empties."""
     return [re.sub(r"[-']", "", t) for t in tokens if t]
 
@@ -45,7 +45,7 @@ def split_text(text: str, mode: str = "words"):
         raise ValueError("Mode must be 'words' or 'sentences' or 'paragraphs'")
 
 
-def parse_text(file_path, mode: str = "words"):
+def parse_text(file_path: str, mode: str = "words"):
     """
     Read a text file and delegate tokenisation to ``split_text`` so that the
     resulting tokens are **identical** to calling ``split_text(f.read(), mode)``.
@@ -67,11 +67,11 @@ def parse_text(file_path, mode: str = "words"):
     return split_text(text, mode=mode)
 
 
-def encode_text(text):
+def encode_text(text: str):
     return _model.encode(text)
 
 
-def cosine_text_similarity(text1, text2):
+def cosine_text_similarity(text1: str, text2: str):
     embedding1 = encode_text(text1)
     embedding2 = encode_text(text2)
     return np.dot(embedding1, embedding2) / (
@@ -79,11 +79,11 @@ def cosine_text_similarity(text1, text2):
     )
 
 
-def cosine_similarity(vec1, vec2):
+def cosine_similarity(vec1: list[float], vec2: list[float]):
     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
 
-def lemmatize_text(text):
+def lemmatize_text(text: str):
     tokens = word_tokenize(text)
     tagged = pos_tag(tokens)
     lemmatized = [
@@ -92,7 +92,7 @@ def lemmatize_text(text):
     return lemmatized
 
 
-def get_wordnet_pos(treebank_tag):
+def get_wordnet_pos(treebank_tag: str):
     if treebank_tag.startswith("J"):
         return wordnet.ADJ
     elif treebank_tag.startswith("V"):

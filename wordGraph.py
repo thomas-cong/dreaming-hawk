@@ -18,12 +18,12 @@ class NodeEncoder(json.JSONEncoder):
 
 
 class WordNodeData:
-    def __init__(self, word, value):
+    def __init__(self, word, value: int):
         self.word = word
         self.value = value
         self.lemmatized = textUtils.lemmatize_text(word)
 
-    def set_value(self, value):
+    def set_value(self, value: int):
         self.value = value
 
     def get_value(self):
@@ -52,7 +52,7 @@ class WordNodeData:
 
 
 class LemmaNodeData:
-    def __init__(self, lemma):
+    def __init__(self, lemma: str):
         self.lemma = lemma
 
     def __str__(self):
@@ -69,13 +69,13 @@ class LemmaGraph(nx.Graph):
     def __init__(self):
         super().__init__()
 
-    def add_lemma_node(self, lemma):
+    def add_lemma_node(self, lemma: str):
         if self.has_node(lemma):
             return None
         self.add_node(lemma, data=LemmaNodeData(lemma))
         return None
 
-    def add_lemma_edge(self, lemma1, lemma2, weight):
+    def add_lemma_edge(self, lemma1: str, lemma2: str, weight: float):
         if not self.has_node(lemma1):
             self.add_lemma_node(lemma1)
         if not self.has_node(lemma2):
@@ -88,7 +88,7 @@ class LemmaGraph(nx.Graph):
             self.add_edge(lemma1, lemma2, weight=weight)
         return None
 
-    def update_lemma_edge(self, lemma1, lemma2, weight):
+    def update_lemma_edge(self, lemma1: str, lemma2: str, weight: float):
         if self.has_edge(lemma1, lemma2):
             self[lemma1][lemma2]["weight"] = weight
         else:
@@ -97,7 +97,7 @@ class LemmaGraph(nx.Graph):
 
 
 class WordGraph(nx.MultiDiGraph):
-    def __init__(self, text_window_size=30, semantic_threshold=0.5):
+    def __init__(self, text_window_size: int = 30, semantic_threshold: float = 0.5):
         super().__init__()
         self.lemma_graph = LemmaGraph()
         self.text_window_size = text_window_size
@@ -116,7 +116,7 @@ class WordGraph(nx.MultiDiGraph):
     def get_lemma_graph(self):
         return self.lemma_graph
 
-    def add_word_node(self, word):
+    def add_word_node(self, word: str) -> None:
         """
         Adds a word to the graph or increments its value if it already exists.
         """
@@ -129,7 +129,7 @@ class WordGraph(nx.MultiDiGraph):
             self.add_node(word, data=node_data)
         return None
 
-    def get_word_node_data(self, word):
+    def get_word_node_data(self, word: str) -> None:
         """
         Access the WordNode object for a given word string.
         """
@@ -137,7 +137,13 @@ class WordGraph(nx.MultiDiGraph):
             return self.nodes[word]["data"]
         return None
 
-    def add_semantic_edge(self, word1, word2, weight, lemma_update=True):
+    def add_semantic_edge(
+        self,
+        word1: str,
+        word2: str,
+        weight: float,
+        lemma_update: bool = True,
+    ) -> None:
         """
         Adds a semantic edge between two words.
         The edge will not expire.
@@ -169,7 +175,7 @@ class WordGraph(nx.MultiDiGraph):
                 self.lemma_graph.add_lemma_edge(lemma1, lemma2, weight=lemma_weight)
         return None
 
-    def add_temporal_edge(self, word1, word2, duration=None):
+    def add_temporal_edge(self, word1: str, word2: str, duration: int = None):
         """
         Adds a temporal edge between two words.
         The edge will expire after the specified duration.
@@ -212,7 +218,13 @@ class WordGraph(nx.MultiDiGraph):
                     self.remove_edge(u, v, key=key_to_remove)
             del self.expiration_object_dict[self.time]
 
-    def add_text(self, text, yield_frames=False, frame_step=1, reset_window=False):
+    def add_text(
+        self,
+        text: str,
+        yield_frames: bool = False,
+        frame_step: int = 1,
+        reset_window: bool = False,
+    ):
         """
         Adds text to the graph.
         If yield_frames is True, this method is a generator that yields graph states.
@@ -231,7 +243,13 @@ class WordGraph(nx.MultiDiGraph):
                 pass
             return None
 
-    def _graphUpdate(self, words, yield_frames=False, frame_step=1, reset_window=False):
+    def _graphUpdate(
+        self,
+        words: list[str],
+        yield_frames: bool = False,
+        frame_step: int = 1,
+        reset_window: bool = False,
+    ):
         if reset_window:
             self.window = []
         step = 0
@@ -308,7 +326,7 @@ class WordGraph(nx.MultiDiGraph):
         print("Words not found: " + str(words_not_found))
 
     def jsonify(self):
-        data = nx.node_link_data(self, edges = "edges")
+        data = nx.node_link_data(self, edges="edges")
         json_str = json.dumps(data, cls=NodeEncoder)
         return json_str
 
@@ -319,9 +337,6 @@ def main():
     graph.add_text("apple apple applesauce")
     with open("./graph.json", "w", encoding="utf-8") as f:
         f.write(graph.jsonify())
-
-        
-    
 
 
 if __name__ == "__main__":

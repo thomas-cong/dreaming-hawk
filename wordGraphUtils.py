@@ -145,6 +145,10 @@ def animateGraphEnrichment(text_path: str, frame_step: int, wg: WordGraph):
 
 
 def main():
-    animateGraphBuilding(text_path="./TrainingTexts/ChalmersPaper.txt", window_size=5, frame_step=1)
+    animateGraphBuilding(
+        text_path="./TrainingTexts/ChalmersPaper.txt", window_size=5, frame_step=1
+    )
+
+
 if __name__ == "__main__":
     main()
