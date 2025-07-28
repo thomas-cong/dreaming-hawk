@@ -6,6 +6,9 @@ import numpy as np
 
 
 class NodeEncoder(json.JSONEncoder):
+    '''
+    JSON encoder for WordNodeData and LemmaNodeData objects.
+    '''
     def default(self, obj):
         if isinstance(obj, WordNodeData):
             return obj.to_dict()
@@ -18,6 +21,9 @@ class NodeEncoder(json.JSONEncoder):
 
 
 class WordNodeData:
+    '''
+    Data associated with a word node.
+    '''
     def __init__(self, word, value: int):
         self.word = word
         self.value = value
@@ -52,6 +58,9 @@ class WordNodeData:
 
 
 class LemmaNodeData:
+    '''
+    Data associated with a lemma node.
+    '''
     def __init__(self, lemma: str):
         self.lemma = lemma
 
@@ -66,6 +75,9 @@ class LemmaNodeData:
 
 
 class LemmaGraph(nx.Graph):
+    '''
+    Undirected graph representing the semantic connections between lemmas.
+    '''
     def __init__(self):
         super().__init__()
 
@@ -97,6 +109,9 @@ class LemmaGraph(nx.Graph):
 
 
 class WordGraph(nx.MultiDiGraph):
+    '''
+    Multi-directional graph representing the semantic connections and temporal connections between words.
+    '''
     def __init__(self, text_window_size: int = 30, semantic_threshold: float = 0.5):
         super().__init__()
         self.lemma_graph = LemmaGraph()
@@ -105,6 +120,8 @@ class WordGraph(nx.MultiDiGraph):
         self.time = 0
         self.expiration_object_dict = {}
         self.embedding_memo = {}
+        self.sentence = []
+        self.paragraph = []
         self.window = []
 
     def get_window(self):
@@ -274,57 +291,39 @@ class WordGraph(nx.MultiDiGraph):
                 self.window.pop(0)
             if yield_frames and step % frame_step == 0:
                 yield self.copy()  # Yield a copy of the graph at each frame step
+    def semantic_update(self, mode: str):
+        """Create semantic edges between **all** tokens currently stored in
+        ``self.sentence`` or ``self.paragraph``.
 
-    def enrich_semantic_connections(
-        self,
-        text,
-        yield_frames=False,
-        frame_step=1,
-        sentence_weighting=0.9,
-        paragraph_weighting=0.6,
-    ):
-        gen = self._enrich_semantic_connections(
-            text, sentence_weighting, paragraph_weighting
-        )
-        if yield_frames:
-            return gen
-        else:
-            # Consume the generator to run the update to completion
-            for _ in gen:
-                pass
-            return None
-
-    def _enrich_semantic_connections(
-        self, text, sentence_weighting=0.9, paragraph_weighting=0.6
-    ):
+        This is a lightweight helper that can be called after you finish
+        collecting a sentence or paragraph in a live-streaming scenario.  It
+        performs three steps:
         """
-        Enriches the graph with semantic connections between words.
-        """
-        if not text:
-            raise ValueError("Text must not be empty")
-        words_not_found = 0
-        # Parse sentences, and semantically link words within sentences
-        sentences = textUtils.split_text(text, mode="sentences")
-        for sentence in tqdm(sentences):
-            word_list = []
-            sentence_words = textUtils.split_text(sentence, mode="words")
-            for word in tqdm(sentence_words):
-                if word not in self.nodes:
-                    self.add_word_node(word)
-                if word not in self.embedding_memo:
-                    words_not_found += 1
-                    self.embedding_memo[word] = textUtils.encode_text(word)
-                for i in range(len(word_list)):
-                    weight = textUtils.cosine_similarity(
-                        self.embedding_memo[word_list[i]], self.embedding_memo[word]
-                    )
-                    self.add_semantic_edge(
-                        word_list[i], word, weight=weight * sentence_weighting
-                    )
-                    yield self.copy()
-                word_list.append(word)
-        print("Words not found: " + str(words_not_found))
+        if mode not in ("sentence", "paragraph"):
+            raise ValueError("Mode must be 'sentence' or 'paragraph'")
 
+        tokens = self.sentence if mode == "sentence" else self.paragraph
+        # Nothing to do for a singleton or empty container.
+        if len(tokens) < 2:
+            return
+
+        # Batch-encode any unseen tokens to minimise model calls.
+        to_encode = [tok for tok in tokens if tok not in self.embedding_memo]
+        if to_encode:
+            self.embedding_memo.update(textUtils.encode_batch(to_encode))
+
+        # Add semantic edges between each unique unordered pair.
+        for i in range(len(tokens)):
+            for j in range(i + 1, len(tokens)):
+                w1, w2 = tokens[i], tokens[j]
+                weight = textUtils.cosine_similarity(
+                    self.embedding_memo[w1], self.embedding_memo[w2]
+                )
+                self.add_semantic_edge(w1, w2, weight=weight)
+
+        # Optionally clear the lists here after processing – leave to caller.
+
+        
     def jsonify(self):
         data = nx.node_link_data(self, edges="edges")
         json_str = json.dumps(data, cls=NodeEncoder)
