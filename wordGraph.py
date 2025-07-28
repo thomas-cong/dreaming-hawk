@@ -259,11 +259,11 @@ class WordGraph(nx.MultiDiGraph):
             step += 1
             self.add_word_node(word)
             self.tick()
-            if word not in self.embedding_memo:
-                self.embedding_memo[word] = textUtils.encode_text(word)
+            # Batch-encode any new tokens (current word + existing window tokens)
+            to_encode = [tok for tok in [word] + self.window if tok not in self.embedding_memo]
+            if to_encode:
+                self.embedding_memo.update(textUtils.encode_batch(to_encode))
             for prev in self.window:
-                if prev not in self.embedding_memo:
-                    self.embedding_memo[prev] = textUtils.encode_text(prev)
                 weight = textUtils.cosine_similarity(
                     self.embedding_memo[prev], self.embedding_memo[word]
                 )

@@ -43,7 +43,9 @@ def split_text(text: str, mode: str = "words"):
         return [p.strip() for p in _PARAGRAPH_SPLIT_PATTERN.split(text) if p.strip()]
     else:
         raise ValueError("Mode must be 'words' or 'sentences' or 'paragraphs'")
-
+def encode_batch(words: list[str]) -> dict[str, np.ndarray]:
+    vecs = _model.encode(words)
+    return dict(zip(words, vecs))
 
 def parse_text(file_path: str, mode: str = "words"):
     """
