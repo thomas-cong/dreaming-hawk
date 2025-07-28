@@ -1,4 +1,9 @@
 import networkx as nx
+import sys, pathlib, os
+# Add project root to sys.path so that `import textUtils` works when running this file directly
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 from tqdm import tqdm
 import textUtils
 import json
@@ -247,11 +252,10 @@ class WordGraph(nx.MultiDiGraph):
         If yield_frames is True, this method is a generator that yields graph states.
         If yield_frames is False, this method runs to completion.
         """
-        if isinstance(text, str):
-            words = textUtils.split_text(text, mode="words")
-        else:
-            words = text
-        gen = self._graphUpdate(words, yield_frames, frame_step, reset_window)
+        text_info = textUtils.extract_all_text_info(text)
+        words = text_info["words"]
+        ending_word_indices = text_info["sentence_ending_words"]
+        gen = self._graphUpdate(words, ending_word_indices, yield_frames, frame_step, reset_window)
         if yield_frames:
             return gen
         else:
@@ -263,6 +267,7 @@ class WordGraph(nx.MultiDiGraph):
     def _graphUpdate(
         self,
         words: list[str],
+        ending_word_indices: list[int],
         yield_frames: bool = False,
         frame_step: int = 1,
         reset_window: bool = False,
@@ -272,7 +277,8 @@ class WordGraph(nx.MultiDiGraph):
         step = 0
         if yield_frames:
             yield self.copy()  # Yield the initial empty graph
-        for word in tqdm(words):
+        current_index = 0
+        for word in tqdm(words):                
             step += 1
             self.add_word_node(word)
             self.tick()
@@ -287,13 +293,18 @@ class WordGraph(nx.MultiDiGraph):
                 self.add_semantic_edge(prev, word, weight=weight)
                 self.add_temporal_edge(prev, word)
             self.window.append(word)
+            self.sentence.append(word)
+            if ending_word_indices and current_index == ending_word_indices[0]:
+                self.semantic_update("sentence")
+                ending_word_indices.pop(0)
             if len(self.window) > self.text_window_size:
                 self.window.pop(0)
             if yield_frames and step % frame_step == 0:
                 yield self.copy()  # Yield a copy of the graph at each frame step
+            current_index += 1
     def semantic_update(self, mode: str):
         """Create semantic edges between **all** tokens currently stored in
-        ``self.sentence`` or ``self.paragraph``.
+        ``self.sentence`` or ``self.paragraph``
 
         This is a lightweight helper that can be called after you finish
         collecting a sentence or paragraph in a live-streaming scenario.  It
@@ -322,6 +333,8 @@ class WordGraph(nx.MultiDiGraph):
                 self.add_semantic_edge(w1, w2, weight=weight)
 
         # Optionally clear the lists here after processing – leave to caller.
+        self.sentence = [] if mode == "sentence" else self.sentence
+        self.paragraph = [] if mode == "paragraph" else self.paragraph
 
         
     def jsonify(self):
@@ -334,6 +347,7 @@ def main():
     # text sequence is apple apple banana
     graph = WordGraph()
     graph.add_text("apple apple applesauce")
+    graph.add_text("My name is Thomas Cong.")
     with open("./graph.json", "w", encoding="utf-8") as f:
         f.write(graph.jsonify())
 

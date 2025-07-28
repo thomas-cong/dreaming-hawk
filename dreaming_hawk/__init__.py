@@ -9,10 +9,18 @@ import importlib
 import sys
 from pathlib import Path
 
-# Ensure the project root is importable
+# Ensure the project root and key sub-directories are importable
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+# Also add commonly referenced nested source directories (e.g. Graphs/WordGraph)
+# so that scripts executed from those folders can `import textUtils`, etc.,
+# without tweaking sys.path locally.
+for sub in (PROJECT_ROOT / "Graphs").glob("*/"):
+    sub_path = str(sub)
+    if sub_path not in sys.path:
+        sys.path.insert(0, sub_path)
 
 # Lazily import existing standalone modules. Support either
 # project-root `wordGraph.py` or `Graphs/WordGraph/wordGraph.py`.

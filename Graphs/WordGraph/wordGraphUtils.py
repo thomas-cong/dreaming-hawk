@@ -1,12 +1,22 @@
-import os
+import os, sys, pathlib
+
+# Ensure project root on path so that `import dreaming_hawk` works when this file
+# is executed directly from its subdirectory.
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-from textUtils import parse_text, cosine_similarity, encode_text
-from wordGraph import WordGraph
+from dreaming_hawk import textUtils, wordGraph as WordGraphModule
+
+# Re-export for brevity
+parse_text = textUtils.parse_text
+cosine_similarity = textUtils.cosine_similarity
+encode_text = textUtils.encode_text
+WordGraph = WordGraphModule.WordGraph
 import networkx as nx
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 
 import matplotlib.animation as animation
 from matplotlib.lines import Line2D
@@ -93,7 +103,8 @@ def _precompute_layout(graph: WordGraph):
 
 def animateGraphBuilding(text_path: str, window_size: int, frame_step: int):
     """Animate graph construction without duplicating work or materialising every frame."""
-    text = parse_text(text_path, mode="words")
+    with open(text_path, "r") as f:
+        text = f.read()
 
     # Build *one* graph to obtain final structure for layout computation – this
     # is O(N) once, instead of twice as before.

@@ -20,7 +20,6 @@ def _clean_tokens(tokens: list[str]):
     """Helper – remove apostrophes / hyphens that may slip through and drop empties."""
     return [re.sub(r"[-']", "", t) for t in tokens if t]
 
-
 def split_text(text: str, mode: str = "words"):
     """Tokenise *text* according to *mode* while ensuring the result is consistent.
 
@@ -43,10 +42,10 @@ def split_text(text: str, mode: str = "words"):
         return [p.strip() for p in _PARAGRAPH_SPLIT_PATTERN.split(text) if p.strip()]
     else:
         raise ValueError("Mode must be 'words' or 'sentences' or 'paragraphs'")
+
 def encode_batch(words: list[str]) -> dict[str, np.ndarray]:
     vecs = _model.encode(words)
     return dict(zip(words, vecs))
-
 def parse_text(file_path: str, mode: str = "words"):
     """
     Read a text file and delegate tokenisation to ``split_text`` so that the
@@ -71,6 +70,38 @@ def parse_text(file_path: str, mode: str = "words"):
 
 def encode_text(text: str):
     return _model.encode(text)
+
+def extract_all_text_info(text: str):
+    '''
+    Workhorse text function that returns all necessary text information to build the word graph
+    '''
+    sentences = split_text(text, mode="sentences")
+    paragraphs = split_text(text, mode="paragraphs")
+    words = split_text(text, mode="words")
+    word_starts = [m.start() for m in re.finditer(r"\S+", text)]
+    sentence_ends = [match.end() - 1 for match in re.finditer(r"\.\.\.|!!!|[.!?]", text)]
+    ending_words = []
+
+    search_from = 0
+    word_start = word_starts[search_from]
+    for end in sentence_ends:
+        if search_from >= len(word_starts):
+            break
+        while word_start <= end and search_from < len(word_starts):
+            word_start = word_starts[search_from]
+            search_from += 1
+        ending_words.append(search_from - 1)
+
+    result_dict = {
+        "words": words,
+        "paragraphs": paragraphs,
+        "sentences": sentences,
+        "sentence_ends": sentence_ends,
+        "word_starts": word_starts,
+        "sentence_ending_words": ending_words,
+        }
+    return result_dict
+    
 
 
 def cosine_text_similarity(text1: str, text2: str):
@@ -108,7 +139,10 @@ def get_wordnet_pos(treebank_tag: str):
 
 
 if __name__ == "__main__":
-    canon = parse_text(
-        "/Users/tcong/dreaming-hawk/TrainingTexts/Letter.txt", mode="words"
-    )
-    print(lemmatize_text(canon[-1]))
+    source = """This is a sentence... This is a second sentence.
+         Is this a sentence? Sure it is!!!"""
+    text_info = extract_all_text_info(source)
+    words = text_info["words"]
+    ending_words = text_info["sentence_ending_words"]
+        
+
