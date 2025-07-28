@@ -14,8 +14,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Lazily import existing standalone modules
-wordGraph = importlib.import_module("wordGraph")
+# Lazily import existing standalone modules. Support either
+# project-root `wordGraph.py` or `Graphs/WordGraph/wordGraph.py`.
+try:
+    wordGraph = importlib.import_module("wordGraph")
+except ModuleNotFoundError:
+    # Fall back to sub-directory location used in some layouts.
+    wordGraph_path = PROJECT_ROOT / "Graphs" / "WordGraph"
+    if str(wordGraph_path) not in sys.path:
+        sys.path.insert(0, str(wordGraph_path))
+    wordGraph = importlib.import_module("wordGraph")
+
 textUtils = importlib.import_module("textUtils")
 
 # Expose submodules so they can be imported as `dreaming_hawk.wordGraph`
