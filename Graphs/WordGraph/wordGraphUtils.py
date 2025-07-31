@@ -127,34 +127,6 @@ def animateGraphBuilding(text_path: str, window_size: int, frame_step: int):
     plt.show()
     return wg_final
 
-
-def animateGraphEnrichment(text_path: str, frame_step: int, wg: WordGraph):
-    """Animate semantic-edge enrichment while avoiding redundant passes."""
-    with open(text_path, "r") as f:
-        text = f.read()
-
-    # Compute final enriched graph once for layout.
-    wg_enriched = wg.copy()
-    wg_enriched.enrich_semantic_connections(text=text, yield_frames=False)
-    pos = _precompute_layout(wg_enriched)
-
-    # Stream enrichment frames from a *fresh* copy (so initial state is clean).
-    wg_stream = wg.copy()
-    frame_gen = wg_stream.enrich_semantic_connections(
-        text=text, yield_frames=True, frame_step=frame_step
-    )
-
-    fig, ax = plt.subplots(figsize=(10, 8))
-
-    def update(frame_graph):
-        visualizeWordGraph(frame_graph, ax, pos)
-
-    ani = animation.FuncAnimation(
-        fig, update, frames=frame_gen, repeat=False, interval=10
-    )
-    plt.show()
-
-
 def main():
     animateGraphBuilding(
         text_path="./TrainingTexts/ChalmersPaper.txt", window_size=5, frame_step=1
