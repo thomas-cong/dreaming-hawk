@@ -2,6 +2,7 @@
 `textUtils` are importable inside the test environment regardless of how pytest
 is invoked.
 """
+
 import sys
 from pathlib import Path
 

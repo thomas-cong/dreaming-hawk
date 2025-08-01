@@ -127,6 +127,7 @@ def animateGraphBuilding(text_path: str, window_size: int, frame_step: int):
     plt.show()
     return wg_final
 
+
 def main():
     animateGraphBuilding(
         text_path="./TrainingTexts/ChalmersPaper.txt", window_size=5, frame_step=1

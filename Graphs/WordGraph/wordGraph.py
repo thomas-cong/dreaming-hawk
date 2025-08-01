@@ -1,5 +1,6 @@
 import networkx as nx
 import sys, pathlib, os
+
 # Add project root to sys.path so that `import textUtils` works when running this file directly
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -11,9 +12,10 @@ import numpy as np
 
 
 class NodeEncoder(json.JSONEncoder):
-    '''
+    """
     JSON encoder for WordNodeData and LemmaNodeData objects.
-    '''
+    """
+
     def default(self, obj):
         if isinstance(obj, WordNodeData):
             return obj.to_dict()
@@ -26,9 +28,10 @@ class NodeEncoder(json.JSONEncoder):
 
 
 class WordNodeData:
-    '''
+    """
     Data associated with a word node.
-    '''
+    """
+
     def __init__(self, word, value: int):
         self.word = word
         self.value = value
@@ -50,6 +53,10 @@ class WordNodeData:
         self.value += other
         return self
 
+    def __isub__(self, other):
+        self.value -= other
+        return self
+
     def __eq__(self, other):
         return (
             isinstance(other, WordNodeData)
@@ -63,9 +70,10 @@ class WordNodeData:
 
 
 class LemmaNodeData:
-    '''
+    """
     Data associated with a lemma node.
-    '''
+    """
+
     def __init__(self, lemma: str):
         self.lemma = lemma
 
@@ -80,9 +88,10 @@ class LemmaNodeData:
 
 
 class LemmaGraph(nx.Graph):
-    '''
+    """
     Undirected graph representing the semantic connections between lemmas.
-    '''
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -114,9 +123,10 @@ class LemmaGraph(nx.Graph):
 
 
 class WordGraph(nx.MultiDiGraph):
-    '''
+    """
     Multi-directional graph representing the semantic connections and temporal connections between words.
-    '''
+    """
+
     def __init__(self, text_window_size: int = 30, semantic_threshold: float = 0.5):
         super().__init__()
         self.lemma_graph = LemmaGraph()
@@ -130,13 +140,19 @@ class WordGraph(nx.MultiDiGraph):
         self.window = []
 
     def get_window(self):
-        return self.window
+        return self.window.copy()
 
     def get_time(self):
         return self.time
 
     def get_lemma_graph(self):
-        return self.lemma_graph
+        return self.lemma_graph.copy()
+
+    def get_sentence(self):
+        return self.sentence.copy()
+
+    def get_paragraph(self):
+        return self.paragraph.copy()
 
     def add_word_node(self, word: str) -> None:
         """
@@ -149,6 +165,11 @@ class WordGraph(nx.MultiDiGraph):
             # Use the string `word` as the node and store WordNode in an attribute
             node_data = WordNodeData(word, 1)
             self.add_node(word, data=node_data)
+        return None
+
+    def minus_word_node(self, word: str) -> None:
+        if self.has_node(word):
+            self.nodes[word]["data"] -= 1
         return None
 
     def get_word_node_data(self, word: str) -> None:
@@ -255,7 +276,9 @@ class WordGraph(nx.MultiDiGraph):
         text_info = textUtils.extract_all_text_info(text)
         words = text_info["words"]
         ending_word_indices = text_info["sentence_ending_words"]
-        gen = self._graphUpdate(words, ending_word_indices, yield_frames, frame_step, reset_window)
+        gen = self._graphUpdate(
+            words, ending_word_indices, yield_frames, frame_step, reset_window
+        )
         if yield_frames:
             return gen
         else:
@@ -278,12 +301,14 @@ class WordGraph(nx.MultiDiGraph):
         if yield_frames:
             yield self.copy()  # Yield the initial empty graph
         current_index = 0
-        for word in tqdm(words):                
+        for word in tqdm(words):
             step += 1
             self.add_word_node(word)
             self.tick()
             # Batch-encode any new tokens (current word + existing window tokens)
-            to_encode = [tok for tok in [word] + self.window if tok not in self.embedding_memo]
+            to_encode = [
+                tok for tok in [word] + self.window if tok not in self.embedding_memo
+            ]
             if to_encode:
                 self.embedding_memo.update(textUtils.encode_batch(to_encode))
             for prev in self.window:
@@ -302,6 +327,7 @@ class WordGraph(nx.MultiDiGraph):
             if yield_frames and step % frame_step == 0:
                 yield self.copy()  # Yield a copy of the graph at each frame step
             current_index += 1
+
     def semantic_update(self, mode: str):
         """Create semantic edges between **all** tokens currently stored in
         ``self.sentence`` or ``self.paragraph``
@@ -336,7 +362,6 @@ class WordGraph(nx.MultiDiGraph):
         self.sentence = [] if mode == "sentence" else self.sentence
         self.paragraph = [] if mode == "paragraph" else self.paragraph
 
-        
     def jsonify(self):
         data = nx.node_link_data(self, edges="edges")
         json_str = json.dumps(data, cls=NodeEncoder)

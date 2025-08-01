@@ -4,6 +4,7 @@ Allows code to `import dreaming_hawk.wordGraph` or `from dreaming_hawk import wo
 without moving the original standalone modules.  It simply re-exports the existing
 `wordGraph` and `textUtils` modules that live at the project root.
 """
+
 from __future__ import annotations
 import importlib
 import sys
