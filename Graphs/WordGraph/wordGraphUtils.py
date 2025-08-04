@@ -195,7 +195,6 @@ def animateGraphBuilding(text_path: str, window_size: int, frame_step: int):
 def main():
     wg = WordGraph(text_window_size=5)
     initializeLiveGraph(wg)
-    print(wg.jsonify())
     pos = _precompute_layout(wg)
     fig, ax = plt.subplots(figsize=(10, 8))
     visualizeWordGraph(wg, ax, pos)
