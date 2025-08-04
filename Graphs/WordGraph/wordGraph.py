@@ -138,6 +138,10 @@ class WordGraph(nx.MultiDiGraph):
         self.sentence = []
         self.paragraph = []
         self.window = []
+    def warm_up(self):
+        self.add_word_node("buffer")
+        self.minus_word_node("buffer")
+        return None
 
     def get_window(self):
         return self.window.copy()
@@ -170,6 +174,8 @@ class WordGraph(nx.MultiDiGraph):
     def minus_word_node(self, word: str) -> None:
         if self.has_node(word):
             self.nodes[word]["data"] -= 1
+        if self.nodes[word]["data"] == 0:
+            self.remove_node(word)
         return None
 
     def get_word_node_data(self, word: str) -> None:
@@ -267,6 +273,7 @@ class WordGraph(nx.MultiDiGraph):
         yield_frames: bool = False,
         frame_step: int = 1,
         reset_window: bool = False,
+
     ):
         """
         Adds text to the graph.
@@ -301,7 +308,7 @@ class WordGraph(nx.MultiDiGraph):
         if yield_frames:
             yield self.copy()  # Yield the initial empty graph
         current_index = 0
-        for word in tqdm(words):
+        for word in words:
             step += 1
             self.add_word_node(word)
             self.tick()

@@ -1,4 +1,6 @@
 import os, sys, pathlib
+import threading
+import tty, termios, time
 
 # Ensure project root on path so that `import dreaming_hawk` works when this file
 # is executed directly from its subdirectory.
@@ -22,7 +24,7 @@ import matplotlib.animation as animation
 from matplotlib.lines import Line2D
 
 
-def visualizeWordGraph(wg, ax, pos):
+def visualizeWordGraph(wg: 'WordGraph', ax, pos):
     ax.clear()
     ax.set_title("Word Graph")
     ax.set_xticks([])
@@ -93,12 +95,74 @@ def visualizeWordGraph(wg, ax, pos):
         ax.legend(handles=legend_elements)
 
 
-def _precompute_layout(graph: WordGraph):
+def _precompute_layout(graph: 'WordGraph'):
     """Return a stable spring layout for *graph*.
     The spring layout can be slow on large graphs so we pin the random seed to
     ensure deterministic results across runs.
     """
     return nx.spring_layout(graph, seed=42)
+
+
+def monitor_input_by_word(graph: 'WordGraph'):
+    """Monitors terminal for new input word-by-word and adds it to the graph."""
+    print("Initializing word-level input monitoring. Press Ctrl+C to exit.")
+    
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    
+    try:
+        tty.setcbreak(sys.stdin.fileno())
+        
+        current_word = ""
+        previous_word = None
+        
+        while True:
+            char = sys.stdin.read(1)
+            # Handle backspace/delete key
+            if char == '\x7f': # ASCII code for backspace/delete
+                if current_word:
+                    # Remove last character from the word
+                    current_word = current_word[:-1]
+                    # Move cursor back, write space to erase, and move back again
+                    sys.stdout.write('\b \b')
+                    sys.stdout.flush()
+            elif char.isspace():
+                if current_word:
+                    if current_word == ":q":
+                        print("\n Exiting dreaming-hawk...")
+                        break
+                    # sys.stdout.write(f'\rWord completed: {current_word}\n')
+                    sys.stdout.flush()
+                    graph.add_text(current_word)
+                    current_word = ""
+                sys.stdout.write(char)
+                sys.stdout.flush()
+            else:
+                sys.stdout.write(char)
+                sys.stdout.flush()
+                current_word += char
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        print("\nTerminal settings restored.")
+
+
+def initializeLiveGraph(graph: 'WordGraph'):
+    """
+    Initializes the live graph and starts monitoring for terminal input
+    at the word level.
+    """
+    with open("./Graphs/WordGraph/hawkASCII.txt", "r") as f:
+        for line in f:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            time.sleep(0.03)
+    sys.stdout.write("Welcome to dreaming-hawk CLI v0 \n")
+    sys.stdout.write("\n Initializing live graph... \n")
+    graph.warm_up()
+    input_thread = threading.Thread(target=monitor_input_by_word, args=(graph,), daemon=True)
+    input_thread.start()
+    sys.stdout.write("Graph initialized. Start typing to add words to the graph. \n")
+    input_thread.join()
 
 
 def animateGraphBuilding(text_path: str, window_size: int, frame_step: int):
@@ -129,10 +193,13 @@ def animateGraphBuilding(text_path: str, window_size: int, frame_step: int):
 
 
 def main():
-    animateGraphBuilding(
-        text_path="./TrainingTexts/ChalmersPaper.txt", window_size=5, frame_step=1
-    )
-
+    wg = WordGraph(text_window_size=5)
+    initializeLiveGraph(wg)
+    print(wg.jsonify())
+    pos = _precompute_layout(wg)
+    fig, ax = plt.subplots(figsize=(10, 8))
+    visualizeWordGraph(wg, ax, pos)
+    plt.show()
 
 if __name__ == "__main__":
     main()
