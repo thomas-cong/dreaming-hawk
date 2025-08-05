@@ -10,6 +10,8 @@ import textUtils
 import json
 import numpy as np
 
+def sigmoid(x: float) -> float:
+    return 1 / (1 + np.exp(-x))
 
 class NodeEncoder(json.JSONEncoder):
     """
@@ -133,15 +135,19 @@ class WordGraph(nx.MultiDiGraph):
         self.text_window_size = text_window_size
         self.semantic_threshold = semantic_threshold
         self.time = 0
-        self.expiration_object_dict = {}
         self.embedding_memo = {}
         self.sentence = []
         self.paragraph = []
         self.window = []
     def warm_up(self):
+        # Warm up the nodes
         self.add_word_node("buffer")
         self.minus_word_node("buffer")
-        return None
+        self.add_semantic_edge("test", "exam", 1.0)
+        self.remove_edge("test", "exam")
+        self.minus_word_node("test")
+        self.minus_word_node("exam")
+
 
     def get_window(self):
         return self.window.copy()
@@ -174,7 +180,7 @@ class WordGraph(nx.MultiDiGraph):
     def minus_word_node(self, word: str) -> None:
         if self.has_node(word):
             self.nodes[word]["data"] -= 1
-        if self.nodes[word]["data"] == 0:
+        if self.nodes[word]["data"].get_value() == 0:
             self.remove_node(word)
         return None
 
@@ -209,8 +215,8 @@ class WordGraph(nx.MultiDiGraph):
         # Edge forms a loop, going both ways
         if weight >= self.semantic_threshold:
             # Use lemmatized words for edge identification
-            self.add_edge(word1, word2, weight=weight)
-            self.add_edge(word2, word1, weight=weight)
+            self.add_edge(word1, word2, weight=weight, creation = self.time, type="semantic")
+            self.add_edge(word2, word1, weight=weight, creation = self.time, type="semantic")
             if lemma_update:
                 lemma1 = textUtils.lemmatize_text(word1)[0]
                 lemma2 = textUtils.lemmatize_text(word2)[0]
@@ -224,48 +230,26 @@ class WordGraph(nx.MultiDiGraph):
                 self.lemma_graph.add_lemma_edge(lemma1, lemma2, weight=lemma_weight)
         return None
 
-    def add_temporal_edge(self, word1: str, word2: str, duration: int = None):
+    def add_temporal_edge(self, word1: str, word2: str, weight: float = 1.0):
         """
         Adds a temporal edge between two words.
         The edge will expire after the specified duration.
         If duration is None, the edge will expire after the text window size of the graph.
         """
-        if duration is None:
-            duration = self.text_window_size
         if not self.has_node(word1):
             self.add_word_node(word1)
         if not self.has_node(word2):
             self.add_word_node(word2)
         self.add_edge(
-            word1, word2, type="temporal", expiration_time=self.time + duration
-        )
-        if self.time + duration not in self.expiration_object_dict:
-            self.expiration_object_dict[self.time + duration] = []
-        self.expiration_object_dict[self.time + duration].append((word1, word2))
+            word1, word2, type="temporal", creation=self.time, weight=weight)
         return None
 
     def tick(self):
         """
         Ticks the graph forward by one time unit.
-        Removes any expired edges.
         """
         self.time += 1
-        if self.time in self.expiration_object_dict:
-            for u, v in self.expiration_object_dict[self.time]:
-                # In a MultiDiGraph, we need to find the specific edge to remove.
-                # We do this by finding an edge with the 'temporal' type.
-                key_to_remove = None
-                if self.has_edge(u, v):
-                    for key, data in self.get_edge_data(u, v).items():
-                        if (
-                            data.get("type") == "temporal"
-                            and data.get("expiration_time") == self.time
-                        ):
-                            key_to_remove = key
-                            break  # Remove one edge per tick
-                if key_to_remove is not None:
-                    self.remove_edge(u, v, key=key_to_remove)
-            del self.expiration_object_dict[self.time]
+        return None
 
     def add_text(
         self,
@@ -304,13 +288,15 @@ class WordGraph(nx.MultiDiGraph):
     ):
         if reset_window:
             self.window = []
-        step = 0
         if yield_frames:
             yield self.copy()  # Yield the initial empty graph
+        step = 0
         current_index = 0
         for word in words:
             step += 1
             self.add_word_node(word)
+            self.window.append(word)
+            self.sentence.append(word)
             self.tick()
             # Batch-encode any new tokens (current word + existing window tokens)
             to_encode = [
@@ -318,14 +304,15 @@ class WordGraph(nx.MultiDiGraph):
             ]
             if to_encode:
                 self.embedding_memo.update(textUtils.encode_batch(to_encode))
-            for prev in self.window:
-                weight = textUtils.cosine_similarity(
+            n = len(self.window) - 1
+            for i in range(n):
+                prev = self.window[i]
+                semantic_weight = textUtils.cosine_similarity(
                     self.embedding_memo[prev], self.embedding_memo[word]
                 )
-                self.add_semantic_edge(prev, word, weight=weight)
-                self.add_temporal_edge(prev, word)
-            self.window.append(word)
-            self.sentence.append(word)
+                temporal_weight = sigmoid((n-i)/n)
+                self.add_semantic_edge(prev, word, weight=semantic_weight)
+                self.add_temporal_edge(prev, word, weight = temporal_weight)
             if ending_word_indices and current_index == ending_word_indices[0]:
                 self.semantic_update("sentence")
                 ending_word_indices.pop(0)

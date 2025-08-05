@@ -39,7 +39,7 @@ def test_decrement_node():
 
 
 def test_add_temporal_edge():
-    g.add_temporal_edge("hello", "thomas", duration=2)
+    g.add_temporal_edge("hello", "thomas")
     assert g.has_edge("hello", "thomas")
 
 
@@ -50,7 +50,7 @@ def test_tick():
     assert g.has_edge("hello", "thomas")
     g.tick()
     assert g.time == time + 2
-    assert not g.has_edge("hello", "thomas", {"type": "temporal"})
+    assert g.has_edge("hello", "thomas")
 
 
 def test_add_sentence():

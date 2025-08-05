@@ -34,7 +34,21 @@ def visualizeWordGraph(wg: 'WordGraph', ax, pos):
     for u, v, data in wg.edges(data=True):
         x1, y1 = pos[u]
         x2, y2 = pos[v]
-        if "weight" in data:  # Semantic edge
+        if data.get("type") == "temporal":
+            ax.annotate(
+                "",
+                xy=(x2, y2),
+                xytext=(x1, y1),
+                arrowprops=dict(
+                    arrowstyle="->",
+                    color="red",
+                    linestyle="dashed",
+                    linewidth=1.0,
+                ),
+                zorder=1,
+            )
+            has_temporal = True
+        elif data.get("type") == "semantic":  # Semantic edge
             ax.plot(
                 [x1, x2],
                 [y1, y2],
@@ -61,16 +75,6 @@ def visualizeWordGraph(wg: 'WordGraph', ax, pos):
                 ),
             )
             has_semantic = True
-        elif data.get("type") == "temporal":
-            ax.plot(
-                [x1, x2],
-                [y1, y2],
-                color="red",
-                linestyle="dashed",
-                linewidth=1.0,
-                zorder=1,
-            )
-            has_temporal = True
     # Draw nodes and labels
     if wg.nodes():  # Check if there are nodes to draw
         node_sizes = [wg.nodes[n]["data"].get_value() * 30 for n in wg.nodes()]
@@ -198,6 +202,7 @@ def main():
     pos = _precompute_layout(wg)
     fig, ax = plt.subplots(figsize=(10, 8))
     visualizeWordGraph(wg, ax, pos)
+    print(wg.jsonify())
     plt.show()
 
 if __name__ == "__main__":

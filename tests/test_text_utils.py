@@ -1,7 +1,5 @@
 import textUtils
 import numpy as np
-
-
 def test_encode_batch_equivalence():
     """
     Test that encoding a batch of words is equivalent to encoding each word
@@ -12,8 +10,6 @@ def test_encode_batch_equivalence():
     batch = textUtils.encode_batch(words)
     for w in words:
         assert np.allclose(single[w], batch[w], atol=1e-6)
-
-
 def test_split_text_modalities():
     """
     Test that split_text modalities are consistent.
