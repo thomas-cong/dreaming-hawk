@@ -11,7 +11,12 @@ def test_create_word_graph():
     assert len(g.edges()) > 0
     assert len(nodes) == 12
     assert window == ["apples", "bananas", "oranges"]
-
+def test_in_out_edges():
+    result = g.in_out_edges("apples")
+    assert result["in"][0] == ("to", "apples")
+    assert result["out"][0] == ("apples", "bananas")
+    
+    
 
 def test_embedding_memo():
     memod_words = {
@@ -35,7 +40,7 @@ def test_embedding_memo():
 def test_decrement_node():
     g.minus_word_node("apples")
     g.minus_word_node("apples")
-    assert g.get_word_node_data("apples").get_value() == 0
+    assert g.get_word_node_data("apples") == None
 
 
 def test_add_temporal_edge():

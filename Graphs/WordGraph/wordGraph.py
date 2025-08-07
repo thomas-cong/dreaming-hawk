@@ -10,8 +10,10 @@ import textUtils
 import json
 import numpy as np
 
+
 def sigmoid(x: float) -> float:
     return 1 / (1 + np.exp(-x))
+
 
 class NodeEncoder(json.JSONEncoder):
     """
@@ -139,6 +141,7 @@ class WordGraph(nx.MultiDiGraph):
         self.sentence = []
         self.paragraph = []
         self.window = []
+
     def warm_up(self):
         # Warm up the nodes
         self.add_word_node("buffer")
@@ -147,7 +150,6 @@ class WordGraph(nx.MultiDiGraph):
         self.remove_edge("test", "exam")
         self.minus_word_node("test")
         self.minus_word_node("exam")
-
 
     def get_window(self):
         return self.window.copy()
@@ -192,6 +194,19 @@ class WordGraph(nx.MultiDiGraph):
             return self.nodes[word]["data"]
         return None
 
+    def _has_edge_with_type(self, u_of_edge: str, v_of_edge: str, edge_type: str):
+        """
+        Check if an edge with a specific type exists between two nodes.
+        """
+        # In a MultiDiGraph, has_edge only checks for any edge.
+        # We need to check all edges between two nodes for the specific type.
+        if not self.has_edge(u_of_edge, v_of_edge):
+            return False
+        for edge_data in self.get_edge_data(u_of_edge, v_of_edge).values():
+            if edge_data.get("type") == edge_type:
+                return True
+        return False
+
     def add_semantic_edge(
         self,
         word1: str,
@@ -213,36 +228,90 @@ class WordGraph(nx.MultiDiGraph):
             self.add_word_node(word2)
         # Add the edge with a weight
         # Edge forms a loop, going both ways
-        if weight >= self.semantic_threshold:
-            # Use lemmatized words for edge identification
-            self.add_edge(word1, word2, weight=weight, creation = self.time, type="semantic")
-            self.add_edge(word2, word1, weight=weight, creation = self.time, type="semantic")
-            if lemma_update:
-                lemma1 = textUtils.lemmatize_text(word1)[0]
-                lemma2 = textUtils.lemmatize_text(word2)[0]
-                if lemma1 not in self.embedding_memo:
-                    self.embedding_memo[lemma1] = textUtils.encode_text(lemma1)
-                if lemma2 not in self.embedding_memo:
-                    self.embedding_memo[lemma2] = textUtils.encode_text(lemma2)
-                lemma_weight = textUtils.cosine_similarity(
-                    self.embedding_memo[lemma1], self.embedding_memo[lemma2]
-                )
-                self.lemma_graph.add_lemma_edge(lemma1, lemma2, weight=lemma_weight)
+        if weight < self.semantic_threshold:
+            return
+
+        if self._has_edge_with_type(word1, word2, "semantic"):
+            self.update_semantic_edge(word1, word2, weight)
+        else:
+            self.add_edge(
+                word1, word2, weight=weight, creation=self.time, type="semantic"
+            )
+
+        if self._has_edge_with_type(word2, word1, "semantic"):
+            self.update_semantic_edge(word2, word1, weight)
+        else:
+            self.add_edge(
+                word2, word1, weight=weight, creation=self.time, type="semantic"
+            )
+
+        if lemma_update:
+            lemma1 = textUtils.lemmatize_text(word1)[0]
+            lemma2 = textUtils.lemmatize_text(word2)[0]
+            if lemma1 not in self.embedding_memo:
+                self.embedding_memo[lemma1] = textUtils.encode_text(lemma1)
+            if lemma2 not in self.embedding_memo:
+                self.embedding_memo[lemma2] = textUtils.encode_text(lemma2)
+            lemma_weight = textUtils.cosine_similarity(
+                self.embedding_memo[lemma1], self.embedding_memo[lemma2]
+            )
+            self.lemma_graph.add_lemma_edge(lemma1, lemma2, weight=lemma_weight)
+        return None
+
+    def update_semantic_edge(self, word1: str, word2: str, weight: float):
+        if self._has_edge_with_type(word1, word2, "semantic"):
+            # In a multigraph, we need to find the key of the semantic edge
+            key_to_update = None
+            for key, data in self[word1][word2].items():
+                if data.get('type') == 'semantic':
+                    key_to_update = key
+                    break
+            if key_to_update is not None:
+                self[word1][word2][key_to_update]["weight"] = weight
+        else:
+            raise ValueError(f"Semantic edge does not exist between {word1} and {word2}")
         return None
 
     def add_temporal_edge(self, word1: str, word2: str, weight: float = 1.0):
         """
         Adds a temporal edge between two words.
-        The edge will expire after the specified duration.
-        If duration is None, the edge will expire after the text window size of the graph.
         """
         if not self.has_node(word1):
             self.add_word_node(word1)
         if not self.has_node(word2):
             self.add_word_node(word2)
-        self.add_edge(
-            word1, word2, type="temporal", creation=self.time, weight=weight)
+        if self._has_edge_with_type(word1, word2, "temporal"):
+            # If edge exists, update it only if the new weight is higher
+            edge_data = None
+            for key, data in self[word1][word2].items():
+                if data.get('type') == 'temporal':
+                    edge_data = data
+                    break
+            if edge_data and edge_data["weight"] < weight:
+                self.update_temporal_edge(word1, word2, weight=weight)
+            return None
+        
+        self.add_edge(word1, word2, type="temporal", creation=self.time, weight=weight)
         return None
+
+    def update_temporal_edge(self, word1: str, word2: str, weight: float):
+        if self._has_edge_with_type(word1, word2, "temporal"):
+            key_to_update = None
+            for key, data in self[word1][word2].items():
+                if data.get('type') == 'temporal':
+                    key_to_update = key
+                    break
+            if key_to_update is not None:
+                self[word1][word2][key_to_update]["weight"] = weight
+        else:
+            raise ValueError(f"Temporal edge does not exist between {word1} and {word2}")
+        return None
+
+    def in_out_edges(self, word: str):
+        result = {"in": [], "out": []}
+        result["in"] = [x for x in self.in_edges(word)]
+        result["out"] = [x for x in self.out_edges(word)]
+        return result
 
     def tick(self):
         """
@@ -257,7 +326,6 @@ class WordGraph(nx.MultiDiGraph):
         yield_frames: bool = False,
         frame_step: int = 1,
         reset_window: bool = False,
-
     ):
         """
         Adds text to the graph.
@@ -297,6 +365,9 @@ class WordGraph(nx.MultiDiGraph):
             self.add_word_node(word)
             self.window.append(word)
             self.sentence.append(word)
+
+            if len(self.window) > self.text_window_size:
+                self.window.pop(0)
             self.tick()
             # Batch-encode any new tokens (current word + existing window tokens)
             to_encode = [
@@ -310,14 +381,12 @@ class WordGraph(nx.MultiDiGraph):
                 semantic_weight = textUtils.cosine_similarity(
                     self.embedding_memo[prev], self.embedding_memo[word]
                 )
-                temporal_weight = sigmoid((n-i)/n)
+                temporal_weight = sigmoid((n - i) / n)
                 self.add_semantic_edge(prev, word, weight=semantic_weight)
-                self.add_temporal_edge(prev, word, weight = temporal_weight)
+                self.add_temporal_edge(prev, word, weight=temporal_weight)
             if ending_word_indices and current_index == ending_word_indices[0]:
                 self.semantic_update("sentence")
                 ending_word_indices.pop(0)
-            if len(self.window) > self.text_window_size:
-                self.window.pop(0)
             if yield_frames and step % frame_step == 0:
                 yield self.copy()  # Yield a copy of the graph at each frame step
             current_index += 1
@@ -367,8 +436,7 @@ def main():
     graph = WordGraph()
     graph.add_text("apple apple applesauce")
     graph.add_text("My name is Thomas Cong.")
-    with open("./graph.json", "w", encoding="utf-8") as f:
-        f.write(graph.jsonify())
+    print(graph.in_out_edges("apple")["in"][0][1])
 
 
 if __name__ == "__main__":

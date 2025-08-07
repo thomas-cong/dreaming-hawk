@@ -24,7 +24,7 @@ import matplotlib.animation as animation
 from matplotlib.lines import Line2D
 
 
-def visualizeWordGraph(wg: 'WordGraph', ax, pos):
+def visualizeWordGraph(wg: "WordGraph", ax, pos):
     ax.clear()
     ax.set_title("Word Graph")
     ax.set_xticks([])
@@ -99,7 +99,7 @@ def visualizeWordGraph(wg: 'WordGraph', ax, pos):
         ax.legend(handles=legend_elements)
 
 
-def _precompute_layout(graph: 'WordGraph'):
+def _precompute_layout(graph: "WordGraph"):
     """Return a stable spring layout for *graph*.
     The spring layout can be slow on large graphs so we pin the random seed to
     ensure deterministic results across runs.
@@ -107,28 +107,28 @@ def _precompute_layout(graph: 'WordGraph'):
     return nx.spring_layout(graph, seed=42)
 
 
-def monitor_input_by_word(graph: 'WordGraph'):
+def monitor_input_by_word(graph: "WordGraph"):
     """Monitors terminal for new input word-by-word and adds it to the graph."""
     print("Initializing word-level input monitoring. Press Ctrl+C to exit.")
-    
+
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
-    
+
     try:
         tty.setcbreak(sys.stdin.fileno())
-        
+
         current_word = ""
         previous_word = None
-        
+
         while True:
             char = sys.stdin.read(1)
             # Handle backspace/delete key
-            if char == '\x7f': # ASCII code for backspace/delete
+            if char == "\x7f":  # ASCII code for backspace/delete
                 if current_word:
                     # Remove last character from the word
                     current_word = current_word[:-1]
                     # Move cursor back, write space to erase, and move back again
-                    sys.stdout.write('\b \b')
+                    sys.stdout.write("\b \b")
                     sys.stdout.flush()
             elif char.isspace():
                 if current_word:
@@ -150,7 +150,7 @@ def monitor_input_by_word(graph: 'WordGraph'):
         print("\nTerminal settings restored.")
 
 
-def initializeLiveGraph(graph: 'WordGraph'):
+def initializeLiveGraph(graph: "WordGraph"):
     """
     Initializes the live graph and starts monitoring for terminal input
     at the word level.
@@ -163,7 +163,9 @@ def initializeLiveGraph(graph: 'WordGraph'):
     sys.stdout.write("Welcome to dreaming-hawk CLI v0 \n")
     sys.stdout.write("\n Initializing live graph... \n")
     graph.warm_up()
-    input_thread = threading.Thread(target=monitor_input_by_word, args=(graph,), daemon=True)
+    input_thread = threading.Thread(
+        target=monitor_input_by_word, args=(graph,), daemon=True
+    )
     input_thread.start()
     sys.stdout.write("Graph initialized. Start typing to add words to the graph. \n")
     input_thread.join()
@@ -198,12 +200,16 @@ def animateGraphBuilding(text_path: str, window_size: int, frame_step: int):
 
 def main():
     wg = WordGraph(text_window_size=5)
+    with open("/Users/tcong/dreaming-hawk/TrainingTexts/ChalmersPaper.txt", "r") as f:
+        text = f.read()
+    wg.add_text(text)
     initializeLiveGraph(wg)
     pos = _precompute_layout(wg)
     fig, ax = plt.subplots(figsize=(10, 8))
     visualizeWordGraph(wg, ax, pos)
     print(wg.jsonify())
     plt.show()
+
 
 if __name__ == "__main__":
     main()
