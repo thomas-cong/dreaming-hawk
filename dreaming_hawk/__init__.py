@@ -15,24 +15,43 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Also add commonly referenced nested source directories (e.g. Graphs/WordGraph)
-# so that scripts executed from those folders can `import textUtils`, etc.,
-# without tweaking sys.path locally.
-for sub in (PROJECT_ROOT / "Graphs").glob("*/"):
-    sub_path = str(sub)
-    if sub_path not in sys.path:
-        sys.path.insert(0, sub_path)
+# Also add commonly referenced nested source directories for both legacy
+# and current layouts, so modules like `wordGraph` resolve without local tweaks.
+for p in [
+    PROJECT_ROOT / "Graphs",
+    PROJECT_ROOT / "backend" / "Graphs",
+    PROJECT_ROOT / "backend" / "Graphs" / "WordGraph",
+    PROJECT_ROOT / "Graphs" / "WordGraph",
+]:
+    sp = str(p)
+    if p.exists() and sp not in sys.path:
+        sys.path.insert(0, sp)
 
 # Lazily import existing standalone modules. Support either
-# project-root `wordGraph.py` or `Graphs/WordGraph/wordGraph.py`.
+# project-root `wordGraph.py` or nested `Graphs/WordGraph/wordGraph.py`
+_wordgraph_import_err = None
 try:
     wordGraph = importlib.import_module("wordGraph")
-except ModuleNotFoundError:
-    # Fall back to sub-directory location used in some layouts.
-    wordGraph_path = PROJECT_ROOT / "Graphs" / "WordGraph"
-    if str(wordGraph_path) not in sys.path:
-        sys.path.insert(0, str(wordGraph_path))
-    wordGraph = importlib.import_module("wordGraph")
+except ModuleNotFoundError as e:
+    _wordgraph_import_err = e
+    # Try known nested locations explicitly
+    for candidate in [
+        PROJECT_ROOT / "Graphs" / "WordGraph",
+        PROJECT_ROOT / "backend" / "Graphs" / "WordGraph",
+    ]:
+        if candidate.exists():
+            sp = str(candidate)
+            if sp not in sys.path:
+                sys.path.insert(0, sp)
+            try:
+                wordGraph = importlib.import_module("wordGraph")
+                _wordgraph_import_err = None
+                break
+            except ModuleNotFoundError as e2:
+                _wordgraph_import_err = e2
+                continue
+    if _wordgraph_import_err is not None:
+        raise _wordgraph_import_err
 
 textUtils = importlib.import_module("textUtils")
 
