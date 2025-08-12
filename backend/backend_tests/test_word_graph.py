@@ -1,4 +1,4 @@
-from dreaming_hawk import wordGraph
+from backend.Graphs import wordGraph
 
 text = "Hello, my name is Thomas. I like to eat apples, bananas, oranges. Apples. Bananas. Oranges."
 g = wordGraph.WordGraph(text_window_size=3)

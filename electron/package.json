@@ -1,0 +1,38 @@
+{
+    "name": "dreaming-hawk",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "dev:react": "npm --prefix renderer run dev",
+        "dev:backend": "cd .. && source dreaming-hawk-venv/bin/activate && uvicorn backend.app:app --reload --port 5179",
+        "dev": "concurrently -k \"npm:dev:backend\" \"npm:dev:react\" \"wait-on http-get://127.0.0.1:5179/health http-get://localhost:5173 && cross-env NODE_ENV=development npm start\"",
+        "build:react": "npm --prefix renderer run build",
+        "build": "npm run build:react && electron-builder"
+    },
+    "build": {
+        "appId": "com.example.dreaminghawk",
+        "files": [
+            "**/*"
+        ],
+        "extraResources": [
+            {
+                "from": "../dist-backend/",
+                "to": "backend",
+                "filter": [
+                    "**/*"
+                ]
+            }
+        ]
+    },
+    "dependencies": {
+        "axios": "^1.7.2",
+        "electron": "^30.0.0",
+        "electron-builder": "^24.13.3",
+        "get-port": "^7.0.0"
+    },
+    "devDependencies": {
+        "concurrently": "^9.0.0",
+        "cross-env": "^7.0.3",
+        "wait-on": "^7.2.0"
+    }
+}

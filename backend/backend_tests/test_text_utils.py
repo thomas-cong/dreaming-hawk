@@ -1,4 +1,4 @@
-import textUtils
+from backend import textUtils
 import numpy as np
 
 

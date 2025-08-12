@@ -1,12 +1,8 @@
 import networkx as nx
 import sys, pathlib, os
 
-# Add project root to sys.path so that `import textUtils` works when running this file directly
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 from tqdm import tqdm
-import textUtils
+from backend import textUtils
 import json
 import numpy as np
 
