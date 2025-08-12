@@ -1,7 +1,7 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-from Graphs import WordGraph
+from backend.Graphs.wordGraph import WordGraph
 
 app = FastAPI()
 app.add_middleware(
@@ -13,6 +13,10 @@ app.add_middleware(
 )
 
 wg = WordGraph(text_window_size=5)
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 @app.get("/test")
 def test():
