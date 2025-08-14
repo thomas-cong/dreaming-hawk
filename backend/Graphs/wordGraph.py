@@ -2,7 +2,7 @@ import networkx as nx
 import sys, pathlib, os
 
 from tqdm import tqdm
-from backend import textUtils
+import textUtils
 import json
 import numpy as np
 

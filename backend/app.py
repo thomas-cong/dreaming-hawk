@@ -1,7 +1,8 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.Graphs.wordGraph import WordGraph
+# Fix the import path to use relative import instead of absolute
+from Graphs.wordGraph import WordGraph
 
 app = FastAPI()
 app.add_middleware(
@@ -30,3 +31,6 @@ def reset():
 def add_text(text: str):
     wg.add_text(text)
     return {"status": "ok"}
+@app.get("/get_graph")
+def get_json_representation():
+    return wg.jsonify()
