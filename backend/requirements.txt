@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+networkx
+numpy
+tqdm
+python-Levenshtein
+scikit-learn
