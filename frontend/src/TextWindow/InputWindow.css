@@ -1,0 +1,36 @@
+.editor-container {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    font-family: sans-serif;
+}
+
+.toolbar {
+    margin-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.toolbar button {
+    margin-right: 5px;
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background-color: #f0f0f0;
+    cursor: pointer;
+}
+
+.toolbar button:hover {
+    background-color: #e0e0e0;
+}
+
+.editor {
+    min-height: 100px;
+    cursor: text;
+}
+
+.public-DraftEditorPlaceholder-root {
+    color: #999;
+    position: absolute;
+    pointer-events: none;
+}

@@ -1,6 +1,9 @@
 import networkx as nx
 import sys, pathlib, os
 
+# Add the parent directory to the system path to find textUtils
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from tqdm import tqdm
 import textUtils
 import json
@@ -303,10 +306,17 @@ class WordGraph(nx.MultiDiGraph):
             raise ValueError(f"Temporal edge does not exist between {word1} and {word2}")
         return None
 
-    def in_out_edges(self, word: str):
+    def in_out_edges(self, word: str, mode: str = "all"):
         result = {"in": [], "out": []}
-        result["in"] = [x for x in self.in_edges(word)]
-        result["out"] = [x for x in self.out_edges(word)]
+        if mode == "all":
+            result["in"] = [x for x in self.in_edges(word)]
+            result["out"] = [x for x in self.out_edges(word)]
+        elif mode == "temporal":
+            result["in"] = [x for x in self.in_edges(word, keys=True) if self.get_edge_data(x[0], x[1], x[2]).get("type") == "temporal"]
+            result["out"] = [x for x in self.out_edges(word, keys=True) if self.get_edge_data(x[0], x[1], x[2]).get("type") == "temporal"]
+        elif mode == "semantic":
+            result["in"] = [x for x in self.in_edges(word, keys=True) if self.get_edge_data(x[0], x[1], x[2]).get("type") == "semantic"]
+            result["out"] = [x for x in self.out_edges(word, keys=True) if self.get_edge_data(x[0], x[1], x[2]).get("type") == "semantic"]
         return result
 
     def tick(self):
@@ -341,51 +351,99 @@ class WordGraph(nx.MultiDiGraph):
             for _ in gen:
                 pass
             return None
-
+    def delete_text(
+        self,
+        text: str,
+        yield_frames: bool = False,
+        reset_window: bool = False,
+    ):
+        """
+        Deletes text from the graph.
+        If yield_frames is True, this method is a generator that yields graph states.
+        If yield_frames is False, this method runs to completion.
+        """
+        text_info = textUtils.extract_all_text_info(text)
+        words = text_info["words"]
+        gen = self._graphUpdate(words, mode="delete", yield_frames=yield_frames, reset_window=reset_window)
+        if yield_frames:
+            return gen
+        else:
+            # Consume the generator to run the update to completion
+            for _ in gen:
+                pass
+            return None
     def _graphUpdate(
         self,
         words: list[str],
-        ending_word_indices: list[int],
+        ending_word_indices: list[int] | None = None,
         yield_frames: bool = False,
         frame_step: int = 1,
         reset_window: bool = False,
+        mode = "add"
     ):
-        if reset_window:
-            self.window = []
-        if yield_frames:
-            yield self.copy()  # Yield the initial empty graph
-        step = 0
-        current_index = 0
-        for word in words:
-            step += 1
-            self.add_word_node(word)
-            self.window.append(word)
-            self.sentence.append(word)
+        if mode == "add":
+            if reset_window:
+                self.window = []
+            if yield_frames:
+                yield self.copy()  # Yield the initial empty graph
+            step = 0
+            current_index = 0
+            for word in words:
+                step += 1
+                self.add_word_node(word)
+                self.window.append(word)
+                self.sentence.append(word)
 
-            if len(self.window) > self.text_window_size:
-                self.window.pop(0)
-            self.tick()
-            # Batch-encode any new tokens (current word + existing window tokens)
-            to_encode = [
-                tok for tok in [word] + self.window if tok not in self.embedding_memo
-            ]
-            if to_encode:
-                self.embedding_memo.update(textUtils.encode_batch(to_encode))
-            n = len(self.window) - 1
-            for i in range(n):
-                prev = self.window[i]
-                semantic_weight = textUtils.cosine_similarity(
-                    self.embedding_memo[prev], self.embedding_memo[word]
-                )
-                temporal_weight = sigmoid((n - i) / n)
-                self.add_semantic_edge(prev, word, weight=semantic_weight)
-                self.add_temporal_edge(prev, word, weight=temporal_weight)
-            if ending_word_indices and current_index == ending_word_indices[0]:
-                self.semantic_update("sentence")
-                ending_word_indices.pop(0)
-            if yield_frames and step % frame_step == 0:
-                yield self.copy()  # Yield a copy of the graph at each frame step
-            current_index += 1
+                if len(self.window) > self.text_window_size:
+                    self.window.pop(0)
+                self.tick()
+                # Batch-encode any new tokens (current word + existing window tokens)
+                to_encode = [
+                    tok for tok in [word] + self.window if tok not in self.embedding_memo
+                ]
+                if to_encode:
+                    self.embedding_memo.update(textUtils.encode_batch(to_encode))
+                n = len(self.window) - 1
+                for i in range(n):
+                    prev = self.window[i]
+                    semantic_weight = textUtils.cosine_similarity(
+                        self.embedding_memo[prev], self.embedding_memo[word]
+                    )
+                    temporal_weight = sigmoid((n - i) / n)
+                    self.add_semantic_edge(prev, word, weight=semantic_weight)
+                    self.add_temporal_edge(prev, word, weight=temporal_weight)
+                if ending_word_indices and current_index == ending_word_indices[0]:
+                    self.semantic_update("sentence")
+                    ending_word_indices.pop(0)
+                if yield_frames and step % frame_step == 0:
+                    yield self.copy()  # Yield a copy of the graph at each frame step
+                current_index += 1
+        elif mode == "delete":
+            for word in words:
+                if word not in self.nodes():
+                    continue
+                edges = self.in_out_edges(word, mode="temporal")
+                for edge in edges["in"] + edges["out"]:
+                    try:
+                        self.remove_edge(edge[0], edge[1], edge[2])
+                    except nx.NetworkXError:
+                        pass
+                self.minus_word_node(word)
+                try:
+                    self.window.remove(word)
+                except ValueError:
+                    pass
+                try:
+                    self.sentence.remove(word)
+                except ValueError:
+                    pass
+                try:
+                    self.paragraph.remove(word)
+                except ValueError:
+                    pass
+                if yield_frames:
+                    yield self.copy()
+            
 
     def semantic_update(self, mode: str):
         """Create semantic edges between **all** tokens currently stored in
@@ -432,7 +490,10 @@ def main():
     graph = WordGraph()
     graph.add_text("apple apple applesauce")
     graph.add_text("My name is Thomas Cong.")
-    print(graph.in_out_edges("apple")["in"][0][1])
+    edge = graph.in_out_edges("apple", mode="temporal")["out"]
+    graph.delete_text("applesauce my")
+    print(graph.edges())
+    print(graph.nodes())
 
 
 if __name__ == "__main__":

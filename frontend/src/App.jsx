@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-
+import InputWindow from "./TextWindow/InputWindow";
 // --- Configuration ---
 // The base URL for your Python backend API.
 // Make sure your FastAPI backend is running and accessible at this address.
@@ -10,7 +10,7 @@ const API_BASE_URL = "http://localhost:8000";
  * A minimal and clean main application component.
  * It demonstrates how to fetch data from the backend on component mount.
  */
-function App() {
+const App = () => {
     // --- State ---
     // `backendStatus` stores the health status message from the backend.
     // `error` stores any error message if the API call fails.
@@ -67,14 +67,9 @@ function App() {
                 <p>{backendStatus}</p>
                 {error && <p style={{ color: "red" }}>{error}</p>}
             </main>
-            <footer style={{ marginTop: "50px", color: "#888" }}>
-                <p>You can now start building your features!</p>
-                <p>
-                    Edit <code>src/App.jsx</code> to get started.
-                </p>
-            </footer>
+            <InputWindow />
         </div>
     );
-}
+};
 
 export default App;
