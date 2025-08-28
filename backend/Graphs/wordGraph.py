@@ -480,7 +480,10 @@ class WordGraph(nx.MultiDiGraph):
         self.paragraph = [] if mode == "paragraph" else self.paragraph
 
     def jsonify(self):
-        data = nx.node_link_data(self, edges="edges")
+        # node_link_data is not suitable for MultiDiGraph, build manually
+        nodes = [{'id': n, 'data': d['data']} for n, d in self.nodes(data=True)]
+        edges = [{'source': u, 'target': v, 'key': k, **d} for u, v, k, d in self.edges(keys=True, data=True)]
+        data = {'nodes': nodes, 'edges': edges}
         json_str = json.dumps(data, cls=NodeEncoder)
         return json_str
 

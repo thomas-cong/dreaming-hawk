@@ -5,3 +5,6 @@ numpy
 tqdm
 python-Levenshtein
 scikit-learn
+websockets
+sentence-transformers
+nltk
