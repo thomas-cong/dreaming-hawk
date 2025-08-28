@@ -8,6 +8,23 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
+const simpleHash = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash |= 0; // Convert to 32bit integer
+    }
+    return hash;
+};
+
+const getPositionFromLemma = (lemma) => {
+    const hash = simpleHash(lemma);
+    const x = (hash & 0xffff) % 800;
+    const y = (hash >> 16) % 600;
+    return { x, y };
+};
+
 function App() {
     const [text, setText] = useState("");
     const [currentWord, setCurrentWord] = useState("");
@@ -37,7 +54,7 @@ function App() {
 
         if (newText.endsWith(" ") || newText.endsWith("\n")) {
             if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-                ws.current.send(newText);
+                ws.current.send(JSON.stringify({ text: newText, mode: "add" }));
             }
             setCurrentWord("");
         } else {
@@ -46,26 +63,67 @@ function App() {
         }
     };
 
-    const updateGraph = (graphData) => {
-        const newNodes = graphData.nodes.map((node) => ({
-            id: node.id.toString(),
-            data: { label: `${node.data.word} (${node.data.value})` },
-            position: { x: Math.random() * 800, y: Math.random() * 600 },
-        }));
+    const updateGraph = (message) => {
+        if (message.type === 'full') {
+            const { nodes: incomingNodes, edges: incomingEdges } = message.payload;
 
-        const newEdges = graphData.edges.map((link) => ({
-            id: `${link.source}-${link.target}-${link.key}`,
-            source: link.source.toString(),
-            target: link.target.toString(),
-            label: `${link.type} (${link.weight.toFixed(2)})`,
-            animated: link.type === "temporal",
-            style: {
-                stroke: link.type === "semantic" ? "#4ade80" : "#60a5fa",
-            },
-        }));
+            const newNodes = incomingNodes.map((node) => {
+                const lemma = node.data.lemmatized?.[0] || node.data.word;
+                const position = getPositionFromLemma(lemma);
+                return {
+                    id: node.id.toString(),
+                    data: { label: `${node.data.word} (${node.data.value})` },
+                    position,
+                };
+            });
 
-        setNodes(newNodes);
-        setEdges(newEdges);
+            const newEdges = incomingEdges.map((link) => ({
+                id: `${link.source}-${link.target}-${link.key}`,
+                source: link.source.toString(),
+                target: link.target.toString(),
+                label: `${link.type} (${link.weight.toFixed(2)})`,
+                style: {
+                    stroke: link.type === "semantic" ? "#4ade80" : "#60a5fa",
+                },
+            }));
+
+            setNodes(newNodes);
+            setEdges(newEdges);
+        } else if (message.type === 'diff') {
+            const { added_nodes, updated_nodes, added_edges, updated_edges } = message.payload;
+
+            const nodeUpdates = [...added_nodes, ...updated_nodes].map((node) => {
+                const lemma = node.data.lemmatized?.[0] || node.data.word;
+                const position = getPositionFromLemma(lemma);
+                return {
+                    id: node.id.toString(),
+                    data: { label: `${node.data.word} (${node.data.value})` },
+                    position,
+                };
+            });
+
+            const edgeUpdates = [...added_edges, ...updated_edges].map((link) => ({
+                id: `${link.source}-${link.target}-${link.key}`,
+                source: link.source.toString(),
+                target: link.target.toString(),
+                label: `${link.type} (${link.weight.toFixed(2)})`,
+                style: {
+                    stroke: link.type === "semantic" ? "#4ade80" : "#60a5fa",
+                },
+            }));
+
+            setNodes(currentNodes => {
+                const nodeMap = new Map(currentNodes.map(n => [n.id, n]));
+                nodeUpdates.forEach(n => nodeMap.set(n.id, n));
+                return Array.from(nodeMap.values());
+            });
+
+            setEdges(currentEdges => {
+                const edgeMap = new Map(currentEdges.map(e => [e.id, e]));
+                edgeUpdates.forEach(e => edgeMap.set(e.id, e));
+                return Array.from(edgeMap.values());
+            });
+        }
     };
 
     const displayedNodes = useMemo(() => {

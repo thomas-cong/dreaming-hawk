@@ -140,6 +140,10 @@ class WordGraph(nx.MultiDiGraph):
         self.sentence = []
         self.paragraph = []
         self.window = []
+        self._added_nodes = set()
+        self._updated_nodes = set()
+        self._added_edges = []
+        self._updated_edges = []
 
     def warm_up(self):
         # Warm up the nodes
@@ -170,18 +174,19 @@ class WordGraph(nx.MultiDiGraph):
         Adds a word to the graph or increments its value if it already exists.
         """
         if self.has_node(word):
-            # Access the data via the string `word`
             self.nodes[word]["data"] += 1
+            self._updated_nodes.add(word)
         else:
-            # Use the string `word` as the node and store WordNode in an attribute
             node_data = WordNodeData(word, 1)
             self.add_node(word, data=node_data)
+            self._added_nodes.add(word)
         return None
 
     def minus_word_node(self, word: str) -> None:
         if self.has_node(word):
             self.nodes[word]["data"] -= 1
         if self.nodes[word]["data"].get_value() == 0:
+            # Node removal is not tracked in this diff implementation
             self.remove_node(word)
         return None
 
@@ -233,16 +238,18 @@ class WordGraph(nx.MultiDiGraph):
         if self._has_edge_with_type(word1, word2, "semantic"):
             self.update_semantic_edge(word1, word2, weight)
         else:
-            self.add_edge(
+            edge_key = self.add_edge(
                 word1, word2, weight=weight, creation=self.time, type="semantic"
             )
+            self._added_edges.append((word1, word2, edge_key))
 
         if self._has_edge_with_type(word2, word1, "semantic"):
             self.update_semantic_edge(word2, word1, weight)
         else:
-            self.add_edge(
+            edge_key = self.add_edge(
                 word2, word1, weight=weight, creation=self.time, type="semantic"
             )
+            self._added_edges.append((word2, word1, edge_key))
 
         if lemma_update:
             lemma1 = textUtils.lemmatize_text(word1)[0]
@@ -267,6 +274,7 @@ class WordGraph(nx.MultiDiGraph):
                     break
             if key_to_update is not None:
                 self[word1][word2][key_to_update]["weight"] = weight
+                self._updated_edges.append((word1, word2, key_to_update))
         else:
             raise ValueError(f"Semantic edge does not exist between {word1} and {word2}")
         return None
@@ -290,7 +298,8 @@ class WordGraph(nx.MultiDiGraph):
                 self.update_temporal_edge(word1, word2, weight=weight)
             return None
         
-        self.add_edge(word1, word2, type="temporal", creation=self.time, weight=weight)
+        edge_key = self.add_edge(word1, word2, type="temporal", creation=self.time, weight=weight)
+        self._added_edges.append((word1, word2, edge_key))
         return None
 
     def update_temporal_edge(self, word1: str, word2: str, weight: float):
@@ -302,6 +311,7 @@ class WordGraph(nx.MultiDiGraph):
                     break
             if key_to_update is not None:
                 self[word1][word2][key_to_update]["weight"] = weight
+                self._updated_edges.append((word1, word2, key_to_update))
         else:
             raise ValueError(f"Temporal edge does not exist between {word1} and {word2}")
         return None
@@ -351,6 +361,7 @@ class WordGraph(nx.MultiDiGraph):
             for _ in gen:
                 pass
             return None
+
     def delete_text(
         self,
         text: str,
@@ -372,6 +383,7 @@ class WordGraph(nx.MultiDiGraph):
             for _ in gen:
                 pass
             return None
+
     def _graphUpdate(
         self,
         words: list[str],
@@ -379,7 +391,7 @@ class WordGraph(nx.MultiDiGraph):
         yield_frames: bool = False,
         frame_step: int = 1,
         reset_window: bool = False,
-        mode = "add"
+        mode: str = "add"
     ):
         if mode == "add":
             if reset_window:
@@ -443,7 +455,6 @@ class WordGraph(nx.MultiDiGraph):
                     pass
                 if yield_frames:
                     yield self.copy()
-            
 
     def semantic_update(self, mode: str):
         """Create semantic edges between **all** tokens currently stored in
@@ -479,24 +490,29 @@ class WordGraph(nx.MultiDiGraph):
         self.sentence = [] if mode == "sentence" else self.sentence
         self.paragraph = [] if mode == "paragraph" else self.paragraph
 
+    def jsonify_diff(self):
+        """Get the JSON representation of the diff."""
+        diff = {
+            'added_nodes': [{'id': n, 'data': self.nodes[n]['data']} for n in self._added_nodes],
+            'updated_nodes': [{'id': n, 'data': self.nodes[n]['data']} for n in self._updated_nodes],
+            'added_edges': [{'source': u, 'target': v, 'key': k, **self.get_edge_data(u, v, k)} for u, v, k in self._added_edges],
+            'updated_edges': [{'source': u, 'target': v, 'key': k, **self.get_edge_data(u, v, k)} for u, v, k in self._updated_edges],
+        }
+        return json.dumps({"type": "diff", "payload": diff}, cls=NodeEncoder)
+
     def jsonify(self):
         # node_link_data is not suitable for MultiDiGraph, build manually
         nodes = [{'id': n, 'data': d['data']} for n, d in self.nodes(data=True)]
         edges = [{'source': u, 'target': v, 'key': k, **d} for u, v, k, d in self.edges(keys=True, data=True)]
         data = {'nodes': nodes, 'edges': edges}
-        json_str = json.dumps(data, cls=NodeEncoder)
-        return json_str
+        return json.dumps({"type": "full", "payload": data}, cls=NodeEncoder)
 
+    def clear_diff(self):
+        self._added_nodes = set()
+        self._updated_nodes = set()
+        self._added_edges = []
+        self._updated_edges = []
 
-def main():
-    # text sequence is apple apple banana
-    graph = WordGraph()
-    graph.add_text("apple apple applesauce")
-    graph.add_text("My name is Thomas Cong.")
-    edge = graph.in_out_edges("apple", mode="temporal")["out"]
-    graph.delete_text("applesauce my")
-    print(graph.edges())
-    print(graph.nodes())
 
 
 if __name__ == "__main__":

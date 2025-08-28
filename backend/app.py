@@ -1,7 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-
+import json
 # Fix the import path to use relative import instead of absolute
 from Graphs.wordGraph import WordGraph
 
@@ -40,19 +40,22 @@ def get_json_representation():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     # Each client gets its own graph instance to manage state.
-    wg = WordGraph(text_window_size=30, semantic_threshold=0.6)
+    wg = WordGraph(text_window_size=30, semantic_threshold=0.5)
     try:
         while True:
-            data = await websocket.receive_text()
-            
-            # The generator yields graph states
-            graph_generator = wg.add_text(data, yield_frames=True, frame_step=1, reset_window=True)
-            
-            for graph_state in graph_generator:
-                json_data = graph_state.jsonify()
-                await websocket.send_text(json_data)
-                # Add a small delay to prevent overwhelming the client and allow for smooth visualization.
-                await asyncio.sleep(0.05)
+            raw_data = await websocket.receive_text()
+            data = json.loads(raw_data)
+
+            # Process the text completely, which updates the diffs internally
+            wg.add_text(data["text"], yield_frames=False, reset_window=True)
+
+            # Get the JSON representation of the diff
+            json_diff = wg.jsonify_diff()
+            print(json_diff)
+            await websocket.send_text(json_diff)
+
+            # Clear the diff for the next update
+            wg.clear_diff()
     except WebSocketDisconnect:
         print("Client disconnected")
     except Exception as e:
