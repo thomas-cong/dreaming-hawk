@@ -489,7 +489,30 @@ class WordGraph(nx.MultiDiGraph):
         # Optionally clear the lists here after processing – leave to caller.
         self.sentence = [] if mode == "sentence" else self.sentence
         self.paragraph = [] if mode == "paragraph" else self.paragraph
+    def propagate(self, start: str, fluid: float, threshold: float = 0.5):
+        if fluid < threshold:
+            return (0, set())
+        num_nodes = 1
+        visited = set()
+        explored_nodes = {start}
+        for neighbor in self.neighbors(start):
+            if neighbor in visited:
+                continue
+            visited.add(neighbor)
+            # Get all edges between start and neighbor
+            edges_data = self.get_edge_data(start, neighbor)
+            
+            # Find the maximum weight among all edges
+            max_weight = 0
+            for edge_data in edges_data.values():
+                weight = edge_data.get('weight', 0)
+            max_weight = max(max_weight, weight)
+                
+            res = self.propagate(neighbor, fluid * max_weight)
+            num_nodes += res[0]
+            explored_nodes.update(res[1])
 
+        return (num_nodes, explored_nodes)
     def jsonify_diff(self):
         """Get the JSON representation of the diff."""
         diff = {
@@ -513,6 +536,11 @@ class WordGraph(nx.MultiDiGraph):
         self._added_edges = []
         self._updated_edges = []
 
+def main():
+    graph = WordGraph()
+    graph.add_text("Hello world")
+    print(graph.propagate("hello", 0.1))
+    print(graph.jsonify())
 
 
 if __name__ == "__main__":

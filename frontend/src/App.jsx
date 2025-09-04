@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import ReactFlow, {
-    MiniMap,
-    Controls,
-    Background,
-    useNodesState,
-    useEdgesState,
-} from "reactflow";
-import "reactflow/dist/style.css";
+import { useNodesState, useEdgesState } from "reactflow";
+import GraphComponent from "./components/GraphComponent";
+import "./App.css";
 
 const simpleHash = (str) => {
     let hash = 0;
@@ -64,8 +59,9 @@ function App() {
     };
 
     const updateGraph = (message) => {
-        if (message.type === 'full') {
-            const { nodes: incomingNodes, edges: incomingEdges } = message.payload;
+        if (message.type === "full") {
+            const { nodes: incomingNodes, edges: incomingEdges } =
+                message.payload;
 
             const newNodes = incomingNodes.map((node) => {
                 const lemma = node.data.lemmatized?.[0] || node.data.word;
@@ -89,38 +85,46 @@ function App() {
 
             setNodes(newNodes);
             setEdges(newEdges);
-        } else if (message.type === 'diff') {
-            const { added_nodes, updated_nodes, added_edges, updated_edges } = message.payload;
+        } else if (message.type === "diff") {
+            const { added_nodes, updated_nodes, added_edges, updated_edges } =
+                message.payload;
 
-            const nodeUpdates = [...added_nodes, ...updated_nodes].map((node) => {
-                const lemma = node.data.lemmatized?.[0] || node.data.word;
-                const position = getPositionFromLemma(lemma);
-                return {
-                    id: node.id.toString(),
-                    data: { label: `${node.data.word} (${node.data.value})` },
-                    position,
-                };
-            });
+            const nodeUpdates = [...added_nodes, ...updated_nodes].map(
+                (node) => {
+                    const lemma = node.data.lemmatized?.[0] || node.data.word;
+                    const position = getPositionFromLemma(lemma);
+                    return {
+                        id: node.id.toString(),
+                        data: {
+                            label: `${node.data.word} (${node.data.value})`,
+                        },
+                        position,
+                    };
+                }
+            );
 
-            const edgeUpdates = [...added_edges, ...updated_edges].map((link) => ({
-                id: `${link.source}-${link.target}-${link.key}`,
-                source: link.source.toString(),
-                target: link.target.toString(),
-                label: `${link.type} (${link.weight.toFixed(2)})`,
-                style: {
-                    stroke: link.type === "semantic" ? "#4ade80" : "#60a5fa",
-                },
-            }));
+            const edgeUpdates = [...added_edges, ...updated_edges].map(
+                (link) => ({
+                    id: `${link.source}-${link.target}-${link.key}`,
+                    source: link.source.toString(),
+                    target: link.target.toString(),
+                    label: `${link.type} (${link.weight.toFixed(2)})`,
+                    style: {
+                        stroke:
+                            link.type === "semantic" ? "#4ade80" : "#60a5fa",
+                    },
+                })
+            );
 
-            setNodes(currentNodes => {
-                const nodeMap = new Map(currentNodes.map(n => [n.id, n]));
-                nodeUpdates.forEach(n => nodeMap.set(n.id, n));
+            setNodes((currentNodes) => {
+                const nodeMap = new Map(currentNodes.map((n) => [n.id, n]));
+                nodeUpdates.forEach((n) => nodeMap.set(n.id, n));
                 return Array.from(nodeMap.values());
             });
 
-            setEdges(currentEdges => {
-                const edgeMap = new Map(currentEdges.map(e => [e.id, e]));
-                edgeUpdates.forEach(e => edgeMap.set(e.id, e));
+            setEdges((currentEdges) => {
+                const edgeMap = new Map(currentEdges.map((e) => [e.id, e]));
+                edgeUpdates.forEach((e) => edgeMap.set(e.id, e));
                 return Array.from(edgeMap.values());
             });
         }
@@ -156,17 +160,12 @@ function App() {
                 />
             </div>
             <div className="graph-container">
-                <ReactFlow
+                <GraphComponent
                     nodes={displayedNodes}
                     edges={edges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
-                    fitView
-                >
-                    <MiniMap />
-                    <Controls />
-                    <Background />
-                </ReactFlow>
+                />
             </div>
         </div>
     );

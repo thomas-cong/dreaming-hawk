@@ -46,7 +46,8 @@ async def websocket_endpoint(websocket: WebSocket):
             raw_data = await websocket.receive_text()
             data = json.loads(raw_data)
 
-            # Process the text completely, which updates the diffs internally
+            # Reset the graph and then add the text to avoid incrementing counts
+            wg = WordGraph(text_window_size=30, semantic_threshold=0.5)
             wg.add_text(data["text"], yield_frames=False, reset_window=True)
 
             # Get the JSON representation of the diff
