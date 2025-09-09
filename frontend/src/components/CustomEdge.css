@@ -1,0 +1,21 @@
+@keyframes flowAnimation {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animated-edge-path {
+  stroke-dasharray: 6 6;
+  animation: flowAnimation 1s linear infinite;
+}
+
+.react-flow__edge-path {
+  transition: stroke-opacity 0.3s;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 2;
+}

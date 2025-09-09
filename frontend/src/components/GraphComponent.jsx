@@ -7,6 +7,7 @@ import ReactFlow, {
   useEdgesState,
   Panel
 } from "reactflow";
+import CustomEdge from "./CustomEdge";
 import ELK from 'elkjs/lib/elk.bundled.js';
 import "reactflow/dist/style.css";
 import "./GraphComponent.css";
@@ -20,6 +21,11 @@ const elkOptions = {
   'elk.spacing.nodeNode': '80',
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
   'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF'
+};
+
+// Define the edge types with our custom edge
+const edgeTypes = {
+  custom: CustomEdge,
 };
 
 const GraphComponent = ({ nodes, edges, onNodesChange, onEdgesChange }) => {
@@ -90,26 +96,29 @@ const GraphComponent = ({ nodes, edges, onNodesChange, onEdgesChange }) => {
     });
   }, [nodes, edges, getLayoutedElements]);
 
+  // Process edges to use the custom edge type
+  const processedEdges = layoutedEdges.map(edge => ({
+    ...edge,
+    type: 'custom',
+    data: {
+      ...edge.data,
+      // Extract weight from label if it exists
+      weight: edge.label ? parseFloat(edge.label.match(/\((\d+\.?\d*)\)$/)?.[1] || 1) : 1
+    }
+  }));
+
   return (
     <div className="graph-container">
       <ReactFlow
         nodes={layoutedNodes}
-        edges={layoutedEdges}
+        edges={processedEdges}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         fitView
         nodesDraggable={true}
         elementsSelectable={true}
       >
-        <Panel position="top-right">
-          <button 
-            className="layout-button"
-            onClick={handleLayout} 
-            disabled={isLayouting}
-          >
-            {isLayouting ? 'Optimizing Layout...' : 'Optimize Layout'}
-          </button>
-        </Panel>
         <MiniMap 
           nodeStrokeWidth={3}
           zoomable

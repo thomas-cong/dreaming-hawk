@@ -151,20 +151,20 @@ function App() {
 
     return (
         <div className="app-container">
-            <div className="editor-container">
-                <textarea
-                    value={text}
-                    onChange={handleTextChange}
-                    placeholder="Start typing here..."
-                    className="text-editor"
-                />
-            </div>
             <div className="graph-container">
                 <GraphComponent
                     nodes={displayedNodes}
                     edges={edges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
+                />
+            </div>
+            <div className="editor-container">
+                <textarea
+                    value={text}
+                    onChange={handleTextChange}
+                    placeholder="Start typing here..."
+                    className="text-editor"
                 />
             </div>
         </div>
